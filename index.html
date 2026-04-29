@@ -26,7 +26,15 @@
             </div>
         </header>
 
-        <div id="persona-tabs" class="px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex overflow-x-auto gap-2"></div>
+        <section class="border-b border-slate-200 dark:border-slate-700">
+            <div class="px-3 py-2 flex items-center gap-2">
+                <button id="system-preset-toggle" class="preset-toggle-btn" aria-expanded="false" aria-label="プリセット一覧を開く">☰</button>
+            </div>
+            <div id="system-preset-panel" class="system-preset-panel px-3 pb-3 hidden">
+                <p class="text-xs text-slate-600 dark:text-slate-300 mb-2">システム / ユーザープリセット</p>
+                <div id="system-persona-tabs" class="flex overflow-x-auto gap-2"></div>
+            </div>
+        </section>
         <main id="chat-area" class="flex-grow overflow-y-auto p-4 space-y-4 chat-bg scroll-smooth bg-transparent"></main>
         <footer class="p-4 border-t border-[#b89d74] dark:border-slate-700 bg-[#e2cfa7] dark:bg-slate-800 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
             <div class="grid grid-cols-10 gap-3 items-center">
@@ -60,7 +68,10 @@
                     <select id="model" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white"></select>
                     <input type="password" id="gemini-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Gemini API Key">
                     <input type="password" id="openai-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="OpenAI API Key">
-                    <textarea id="system-prompt" rows="4" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="システムプロンプト"></textarea>
+                    <div class="space-y-2">
+                        <textarea id="system-prompt" rows="4" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="システムプロンプト"></textarea>
+                        <button id="clear-system-prompt-btn" class="w-full bg-slate-200 dark:bg-slate-700 dark:text-white py-2 rounded-lg">システムプロンプトを空にする</button>
+                    </div>
                     <label class="text-sm dark:text-white">温度 <span id="temperature-value"></span></label>
                     <input id="temperature" type="range" min="0" max="2" step="0.1" class="w-full">
                     <label class="text-sm dark:text-white">コンテキスト長（トークン） <span id="max-tokens-value"></span></label>

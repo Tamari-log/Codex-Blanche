@@ -88,3 +88,70 @@ body { font-family: 'Noto Serif JP', serif; }
     background-color: #0f172a !important;
     background-image: url('https://www.transparenttextures.com/patterns/dark-matter.png');
 }
+
+.preset-toggle-btn {
+    border: 1px solid #b89d74;
+    border-radius: 9999px;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.85rem;
+    color: #40260f;
+    background: rgba(255, 255, 255, 0.55);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.preset-toggle-btn.is-open {
+    background: #7b4f24;
+    color: #fff;
+    transform: translateX(3px);
+}
+
+.dark .preset-toggle-btn {
+    color: #f8fafc;
+    border-color: #475569;
+    background: rgba(30, 41, 59, 0.8);
+}
+
+.dark .preset-toggle-btn.is-open {
+    background: #334155;
+}
+
+.system-preset-panel {
+    animation: slideIn 0.22s ease;
+}
+
+.persona-tab-btn {
+    border: 1px solid #b89d74;
+    border-radius: 9999px;
+    padding: 0.25rem 0.8rem;
+    font-size: 0.85rem;
+    color: #40260f;
+    background: rgba(255, 255, 255, 0.35);
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.persona-tab-btn.active {
+    background: #7b4f24;
+    border-color: #7b4f24;
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(123, 79, 36, 0.22);
+    transform: translateY(-1px) scale(1.03);
+}
+
+.dark .persona-tab-btn {
+    color: #f8fafc;
+    border-color: #475569;
+    background: rgba(30, 41, 59, 0.72);
+}
+
+.dark .persona-tab-btn.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28);
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+}

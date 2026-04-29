@@ -16,6 +16,10 @@ const state = {
     temperature: Number(localStorage.getItem('temperature') || 0.7),
     maxTokens: Number(localStorage.getItem('max_tokens') || 2048),
   },
+  ui: {
+    showSystemPresetPanel: false,
+    activePersonaId: null,
+  },
 };
 
 const CONTEXT_LIMITS = {
@@ -166,21 +170,23 @@ function addBubble(text, role, index = null, editable = true) {
 }
 
 function renderPersonaTabs() {
-  const wrap = document.getElementById('persona-tabs');
-  wrap.innerHTML = '';
+  const systemWrap = document.getElementById('system-persona-tabs');
+  systemWrap.innerHTML = '';
 
-  const systemPersonas = SYSTEM_PERSONAS.filter((p) => !state.hiddenSystemPersonaIds.includes(p.id));
-  const allPersonas = [
-    ...systemPersonas.map((p) => ({ ...p, isSystem: true })),
-    ...state.personas.map((p, idx) => ({ ...p, customIndex: idx, isSystem: false })),
-  ];
+  const systemPersonas = SYSTEM_PERSONAS
+    .filter((p) => !state.hiddenSystemPersonaIds.includes(p.id))
+    .map((p) => ({ ...p, isSystem: true }));
+  const customPersonas = state.personas.map((p, idx) => ({ ...p, customIndex: idx, isSystem: false, id: `custom-${idx}` }));
+
+  const allPersonas = [...systemPersonas, ...customPersonas];
 
   allPersonas.forEach((p) => {
     const btn = document.createElement('button');
     const group = document.createElement('div');
     group.className = 'flex items-center gap-1';
 
-    btn.className = 'px-3 py-1 rounded-full text-sm border dark:text-white';
+    btn.className = 'persona-tab-btn';
+    if (state.ui.activePersonaId === p.id) btn.classList.add('active');
     btn.innerText = p.name;
     btn.onclick = () => applyPersona(p);
 
@@ -192,15 +198,17 @@ function renderPersonaTabs() {
 
     group.appendChild(btn);
     group.appendChild(del);
-    wrap.appendChild(group);
+    systemWrap.appendChild(group);
   });
 }
 
 function applyPersona(persona) {
   if (!persona) return;
   state.settings = { ...state.settings, ...persona.settings };
+  state.ui.activePersonaId = persona.id;
   applySettingsToUI();
   saveSettings();
+  renderPersonaTabs();
 }
 
 function savePersona() {
@@ -297,6 +305,8 @@ function bindSettings() {
   const systemPrompt = document.getElementById('system-prompt');
   const temperature = document.getElementById('temperature');
   const maxTokens = document.getElementById('max-tokens');
+  const clearSystemPromptBtn = document.getElementById('clear-system-prompt-btn');
+  const systemPresetToggle = document.getElementById('system-preset-toggle');
 
   provider.onchange = () => {
     state.settings.provider = provider.value;
@@ -325,6 +335,26 @@ function bindSettings() {
     document.getElementById('max-tokens-value').innerText = `${maxTokens.value} / ${maxTokens.max}`;
     saveSettings();
   };
+
+  clearSystemPromptBtn.onclick = () => {
+    state.settings.systemPrompt = '';
+    systemPrompt.value = '';
+    saveSettings();
+  };
+
+  systemPresetToggle.onclick = () => {
+    state.ui.showSystemPresetPanel = !state.ui.showSystemPresetPanel;
+    renderSystemPresetPanel();
+  };
+}
+
+function renderSystemPresetPanel() {
+  const panel = document.getElementById('system-preset-panel');
+  const toggle = document.getElementById('system-preset-toggle');
+  panel.classList.toggle('hidden', !state.ui.showSystemPresetPanel);
+  toggle.classList.toggle('is-open', state.ui.showSystemPresetPanel);
+  toggle.setAttribute('aria-expanded', state.ui.showSystemPresetPanel ? 'true' : 'false');
+  toggle.innerText = '☰';
 }
 
 async function handleSend() {
@@ -437,4 +467,5 @@ window.addEventListener('DOMContentLoaded', () => {
   renderHistory();
   renderSessionList();
   renderPersonaTabs();
+  renderSystemPresetPanel();
 });
