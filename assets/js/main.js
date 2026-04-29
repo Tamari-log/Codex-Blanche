@@ -239,17 +239,18 @@ async function handleSend() {
 
   const loading = addBubble('思索中...', 'ai');
   try {
-    const messages = [
-      ...(state.settings.systemPrompt ? [{ role: 'system', text: state.settings.systemPrompt }] : []),
-      ...session.messages,
-    ];
+    const messages = [...session.messages];
     const reply = state.settings.provider === 'gemini'
       ? await callGeminiAPI(messages, apiKey, {
         model: state.settings.geminiModel,
         temperature: state.settings.temperature,
         maxTokens: state.settings.maxTokens,
+        systemInstruction: state.settings.systemPrompt,
       })
-      : await callOpenAIAPI(messages, apiKey, {
+      : await callOpenAIAPI([
+        ...(state.settings.systemPrompt ? [{ role: 'system', text: state.settings.systemPrompt }] : []),
+        ...messages,
+      ], apiKey, {
         model: state.settings.openaiModel,
         temperature: state.settings.temperature,
         maxTokens: state.settings.maxTokens,
