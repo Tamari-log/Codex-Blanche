@@ -13,12 +13,12 @@ body { font-family: 'Noto Serif JP', serif; }
 /* チャットエリア（mainタグ）の調整 */
 #chat-area {
     /* ヘッダーのすぐ下に文字が来ないよう、上部に大きな余白を作る */
-    padding-top: 2rem; 
-    
-    /* 羊皮紙テクスチャの設定（白飛びしないように調整） */
+    padding-top: 2rem;
+
+    /* ライトモードは古い羊皮紙のようなセピア調 */
+    background-color: #e8d8b3 !important;
     background-image: url('https://www.transparenttextures.com/patterns/paper.png');
-    background-blend-mode: multiply; /* 下地のセピア色と画像を合成する */
-    background-color: transparent !important;
+    background-blend-mode: multiply;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -43,10 +43,10 @@ body { font-family: 'Noto Serif JP', serif; }
 
 /* ユーザーの発言：力強い筆跡 */
 .user-msg {
-    color: #1e293b;
+    color: #1f1306;
     font-weight: 700;
     padding-left: 1rem;
-    border-left: 4px solid #64748b;
+    border-left: 4px solid #7b4f24;
     margin-bottom: 2rem;
 }
 
@@ -57,7 +57,7 @@ body { font-family: 'Noto Serif JP', serif; }
 
 /* AIの返答：流麗な記録 */
 .ai-msg {
-    color: #334155;
+    color: #2f2111;
     padding-left: 1rem;
     margin-bottom: 2rem;
     line-height: 2;
@@ -68,15 +68,15 @@ body { font-family: 'Noto Serif JP', serif; }
 }
 
 /* 署名の追加（自動的に Blanche: と Codex: が付きます） */
-.user-msg::before { content: "Blanche:"; display: block; font-size: 0.6rem; opacity: 0.5; margin-bottom: 0.5rem; letter-spacing: 0.2rem; }
-.ai-msg::before { content: "Codex:"; display: block; font-size: 0.6rem; opacity: 0.5; margin-bottom: 0.5rem; letter-spacing: 0.2rem; }
+.user-msg::before { content: "Blanche:"; display: block; font-size: 0.6rem; opacity: 0.65; margin-bottom: 0.5rem; letter-spacing: 0.2rem; color: #5c3a1a; }
+.ai-msg::before { content: "Codex:"; display: block; font-size: 0.6rem; opacity: 0.65; margin-bottom: 0.5rem; letter-spacing: 0.2rem; color: #5c3a1a; }
 
 
 /* 編集中のスタイルも「紙に書き込んでいる」風に */
 [contenteditable="true"]:focus {
     outline: none;
-    background-color: rgba(0, 0, 0, 0.03); /* ほんの少しだけ紙の色が変わる */
-    border-left: 3px solid #3b82f6 !important;
+    background-color: rgba(92, 58, 26, 0.08);
+    border-left: 3px solid #8b5e34 !important;
 }
 
 .dark [contenteditable="true"]:focus {
@@ -85,6 +85,6 @@ body { font-family: 'Noto Serif JP', serif; }
 
 /* ダークモード時の背景調整（既存のものを補強） */
 .dark #chat-area {
-    background-color: #0f172a !important; /* 深い紺色 */
+    background-color: #0f172a !important;
     background-image: url('https://www.transparenttextures.com/patterns/dark-matter.png');
 }
