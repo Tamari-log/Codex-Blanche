@@ -1,0 +1,16 @@
+/* 中世のフォント感を演出 */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap');
+
+body {
+    font-family: 'Noto Serif JP', serif;
+}
+
+/* メッセージのフェードイン */
+.ai-msg, .chat-bubble {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
