@@ -7,6 +7,8 @@ const state = {
   personas: JSON.parse(localStorage.getItem('codex_personas') || '[]'),
   settings: {
     provider: localStorage.getItem('provider') || 'gemini',
+    geminiModel: localStorage.getItem('gemini_model') || 'gemini-2.0-flash',
+    openaiModel: localStorage.getItem('openai_model') || 'gpt-4.1-mini',
     geminiKey: localStorage.getItem('gemini_api_key') || '',
     openaiKey: localStorage.getItem('openai_api_key') || '',
     systemPrompt: localStorage.getItem('system_prompt') || '',
@@ -19,6 +21,42 @@ const CONTEXT_LIMITS = {
   gemini: 150000,
   openai: 50000,
 };
+
+const MODEL_OPTIONS = {
+  gemini: [
+    { value: 'gemini-2.0-flash', label: 'gemini-2.0-flash（高速）' },
+    { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash（新しい高速）' },
+    { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro（高性能）' },
+  ],
+  openai: [
+    { value: 'gpt-4.1-mini', label: 'gpt-4.1-mini（高速）' },
+    { value: 'gpt-4.1', label: 'gpt-4.1（高性能）' },
+    { value: 'gpt-4o-mini', label: 'gpt-4o-mini（軽量）' },
+  ],
+};
+
+function renderModelOptions() {
+  const model = document.getElementById('model');
+  if (!model) return;
+  const provider = state.settings.provider;
+  const options = MODEL_OPTIONS[provider] || [];
+  const selected = provider === 'gemini' ? state.settings.geminiModel : state.settings.openaiModel;
+  model.innerHTML = '';
+  options.forEach((opt) => {
+    const option = document.createElement('option');
+    option.value = opt.value;
+    option.textContent = opt.label;
+    model.appendChild(option);
+  });
+  if (options.some((opt) => opt.value === selected)) {
+    model.value = selected;
+  } else if (options[0]) {
+    model.value = options[0].value;
+    if (provider === 'gemini') state.settings.geminiModel = options[0].value;
+    if (provider === 'openai') state.settings.openaiModel = options[0].value;
+    saveSettings();
+  }
+}
 
 function syncContextSliderLimit() {
   const maxTokens = document.getElementById('max-tokens');
@@ -124,6 +162,8 @@ function renderSessionList() {
 
 function saveSettings() {
   localStorage.setItem('provider', state.settings.provider);
+  localStorage.setItem('gemini_model', state.settings.geminiModel);
+  localStorage.setItem('openai_model', state.settings.openaiModel);
   localStorage.setItem('gemini_api_key', state.settings.geminiKey);
   localStorage.setItem('openai_api_key', state.settings.openaiKey);
   localStorage.setItem('system_prompt', state.settings.systemPrompt);
@@ -134,6 +174,7 @@ function saveSettings() {
 function applySettingsToUI() {
   syncContextSliderLimit();
   document.getElementById('provider').value = state.settings.provider;
+  renderModelOptions();
   document.getElementById('gemini-key').value = state.settings.geminiKey;
   document.getElementById('openai-key').value = state.settings.openaiKey;
   document.getElementById('system-prompt').value = state.settings.systemPrompt;
@@ -145,6 +186,7 @@ function applySettingsToUI() {
 
 function bindSettings() {
   const provider = document.getElementById('provider');
+  const model = document.getElementById('model');
   const geminiKey = document.getElementById('gemini-key');
   const openaiKey = document.getElementById('openai-key');
   const systemPrompt = document.getElementById('system-prompt');
@@ -155,6 +197,14 @@ function bindSettings() {
     state.settings.provider = provider.value;
     syncContextSliderLimit();
     applySettingsToUI();
+    saveSettings();
+  };
+  model.onchange = () => {
+    if (state.settings.provider === 'gemini') {
+      state.settings.geminiModel = model.value;
+    } else {
+      state.settings.openaiModel = model.value;
+    }
     saveSettings();
   };
   geminiKey.onchange = () => { state.settings.geminiKey = geminiKey.value.trim(); saveSettings(); };
@@ -194,8 +244,16 @@ async function handleSend() {
       ...session.messages,
     ];
     const reply = state.settings.provider === 'gemini'
-      ? await callGeminiAPI(messages, apiKey, { temperature: state.settings.temperature, maxTokens: state.settings.maxTokens })
-      : await callOpenAIAPI(messages, apiKey, { temperature: state.settings.temperature, maxTokens: state.settings.maxTokens });
+      ? await callGeminiAPI(messages, apiKey, {
+        model: state.settings.geminiModel,
+        temperature: state.settings.temperature,
+        maxTokens: state.settings.maxTokens,
+      })
+      : await callOpenAIAPI(messages, apiKey, {
+        model: state.settings.openaiModel,
+        temperature: state.settings.temperature,
+        maxTokens: state.settings.maxTokens,
+      });
     session.messages.push({ role: 'ai', text: reply });
     persist();
     renderHistory();
