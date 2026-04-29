@@ -142,10 +142,22 @@ function renderPersonaTabs() {
   wrap.innerHTML = '';
   state.personas.forEach((p, idx) => {
     const btn = document.createElement('button');
+    const group = document.createElement('div');
+    group.className = 'flex items-center gap-1';
+
     btn.className = 'px-3 py-1 rounded-full text-sm border dark:text-white';
     btn.innerText = p.name;
     btn.onclick = () => applyPersona(idx);
-    wrap.appendChild(btn);
+
+    const del = document.createElement('button');
+    del.className = 'px-2 py-1 rounded-full text-xs border border-rose-400 text-rose-600 dark:text-rose-300';
+    del.innerText = '×';
+    del.title = `${p.name} を削除`;
+    del.onclick = () => deletePersona(idx);
+
+    group.appendChild(btn);
+    group.appendChild(del);
+    wrap.appendChild(group);
   });
 }
 
@@ -164,6 +176,37 @@ function savePersona() {
   persist();
   renderPersonaTabs();
   document.getElementById('persona-name').value = '';
+}
+
+
+function deletePersona(idx) {
+  const persona = state.personas[idx];
+  if (!persona) return;
+  const ok = window.confirm(`プリセット「${persona.name}」を削除しますか？`);
+  if (!ok) return;
+  state.personas.splice(idx, 1);
+  persist();
+  renderPersonaTabs();
+}
+
+function formatAssistantError(error) {
+  const message = (error && error.message) ? error.message : String(error || '不明なエラー');
+  const lowered = message.toLowerCase();
+  const safetyPatterns = [
+    'safety',
+    'blocked',
+    'prohibited',
+    'policy',
+    'harmful',
+    'responsibleai',
+    'does not comply',
+    'content filter',
+  ];
+  const isSafetyRefusal = safetyPatterns.some((pattern) => lowered.includes(pattern));
+  if (isSafetyRefusal) {
+    return `⚠️ 安全機構エラー（AI出力拒否）: ${message}`;
+  }
+  return `エラー：${message}`;
 }
 
 function renderSessionList() {
@@ -268,7 +311,7 @@ async function handleSend() {
     persist();
     renderHistory();
   } catch (e) {
-    loading.div.innerText = `エラー：${e.message}`;
+    loading.div.innerText = formatAssistantError(e);
   } finally {
     userInput.disabled = false;
     userInput.focus();
@@ -317,7 +360,7 @@ async function regenerateAt(index) {
     persist();
     renderHistory();
   } catch (e) {
-    loading.div.innerText = `エラー：${e.message}`;
+    loading.div.innerText = formatAssistantError(e);
   }
 }
 
