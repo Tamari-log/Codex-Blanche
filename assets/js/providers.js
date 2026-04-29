@@ -66,7 +66,11 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     throw new Error(`Gemini API request failed (${response.status}): ${detail}`);
   }
   const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '応答を取得できませんでした。';
+  const firstCandidate = data.candidates?.[0];
+  if (firstCandidate?.finishReason === 'SAFETY') {
+    throw new Error('SAFETY_REFUSAL: Gemini safety filter blocked the response');
+  }
+  return firstCandidate?.content?.parts?.[0]?.text || '応答を取得できませんでした。';
 }
 
 async function callOpenAIAPI(messages, apiKey, options = {}) {
@@ -91,7 +95,16 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
     }),
   });
 
-  if (!response.ok) throw new Error('OpenAI API request failed');
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const err = await response.json();
+      detail = err?.error?.message || JSON.stringify(err);
+    } catch {
+      detail = await response.text();
+    }
+    throw new Error(`OpenAI API request failed (${response.status}): ${detail}`);
+  }
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '応答を取得できませんでした。';
 }
