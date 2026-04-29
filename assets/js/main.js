@@ -1,20 +1,44 @@
 const chatArea = document.getElementById('chat-area');
 const userInput = document.getElementById('user-input');
+const dom = {};
+
+const STORAGE_KEYS = {
+  sessions: 'codex_sessions',
+  activeSessionId: 'codex_active_session_id',
+  personas: 'codex_personas',
+  hiddenSystemPersonaIds: 'codex_hidden_system_persona_ids',
+  provider: 'provider',
+  geminiModel: 'gemini_model',
+  openaiModel: 'openai_model',
+  geminiKey: 'gemini_api_key',
+  openaiKey: 'openai_api_key',
+  systemPrompt: 'system_prompt',
+  temperature: 'temperature',
+  maxTokens: 'max_tokens',
+};
+
+function readJSON(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+}
 
 const state = {
-  sessions: JSON.parse(localStorage.getItem('codex_sessions') || '[]'),
-  activeSessionId: localStorage.getItem('codex_active_session_id'),
-  personas: JSON.parse(localStorage.getItem('codex_personas') || '[]'),
-  hiddenSystemPersonaIds: JSON.parse(localStorage.getItem('codex_hidden_system_persona_ids') || '[]'),
+  sessions: readJSON(STORAGE_KEYS.sessions, []),
+  activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId),
+  personas: readJSON(STORAGE_KEYS.personas, []),
+  hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []),
   settings: {
-    provider: localStorage.getItem('provider') || 'gemini',
-    geminiModel: localStorage.getItem('gemini_model') || 'gemini-3.1-pro-preview',
-    openaiModel: localStorage.getItem('openai_model') || 'gpt-4.1-mini',
-    geminiKey: localStorage.getItem('gemini_api_key') || '',
-    openaiKey: localStorage.getItem('openai_api_key') || '',
-    systemPrompt: localStorage.getItem('system_prompt') || '',
-    temperature: Number(localStorage.getItem('temperature') || 0.7),
-    maxTokens: Number(localStorage.getItem('max_tokens') || 2048),
+    provider: localStorage.getItem(STORAGE_KEYS.provider) || 'gemini',
+    geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || 'gemini-3.1-pro-preview',
+    openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || 'gpt-4.1-mini',
+    geminiKey: localStorage.getItem(STORAGE_KEYS.geminiKey) || '',
+    openaiKey: localStorage.getItem(STORAGE_KEYS.openaiKey) || '',
+    systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '',
+    temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7),
+    maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048),
   },
   ui: {
     showSystemPresetPanel: false,
@@ -104,10 +128,10 @@ function getActiveSession() {
 }
 
 function persist() {
-  localStorage.setItem('codex_sessions', JSON.stringify(state.sessions));
-  localStorage.setItem('codex_personas', JSON.stringify(state.personas));
-  localStorage.setItem('codex_active_session_id', state.activeSessionId || '');
-  localStorage.setItem('codex_hidden_system_persona_ids', JSON.stringify(state.hiddenSystemPersonaIds));
+  localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions));
+  localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas));
+  localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || '');
+  localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds));
 }
 
 function startNewSession() {
@@ -282,39 +306,41 @@ function renderSessionList() {
 }
 
 function saveSettings() {
-  localStorage.setItem('provider', state.settings.provider);
-  localStorage.setItem('gemini_model', state.settings.geminiModel);
-  localStorage.setItem('openai_model', state.settings.openaiModel);
-  localStorage.setItem('gemini_api_key', state.settings.geminiKey);
-  localStorage.setItem('openai_api_key', state.settings.openaiKey);
-  localStorage.setItem('system_prompt', state.settings.systemPrompt);
-  localStorage.setItem('temperature', state.settings.temperature);
-  localStorage.setItem('max_tokens', state.settings.maxTokens);
+  localStorage.setItem(STORAGE_KEYS.provider, state.settings.provider);
+  localStorage.setItem(STORAGE_KEYS.geminiModel, state.settings.geminiModel);
+  localStorage.setItem(STORAGE_KEYS.openaiModel, state.settings.openaiModel);
+  localStorage.setItem(STORAGE_KEYS.geminiKey, state.settings.geminiKey);
+  localStorage.setItem(STORAGE_KEYS.openaiKey, state.settings.openaiKey);
+  localStorage.setItem(STORAGE_KEYS.systemPrompt, state.settings.systemPrompt);
+  localStorage.setItem(STORAGE_KEYS.temperature, state.settings.temperature);
+  localStorage.setItem(STORAGE_KEYS.maxTokens, state.settings.maxTokens);
 }
 
 function applySettingsToUI() {
+  const {
+    provider,
+    geminiKey,
+    openaiKey,
+    systemPrompt,
+    temperature,
+    maxTokens,
+    temperatureValue,
+    maxTokensValue,
+  } = dom;
   syncContextSliderLimit();
-  document.getElementById('provider').value = state.settings.provider;
+  provider.value = state.settings.provider;
   renderModelOptions();
-  document.getElementById('gemini-key').value = state.settings.geminiKey;
-  document.getElementById('openai-key').value = state.settings.openaiKey;
-  document.getElementById('system-prompt').value = state.settings.systemPrompt;
-  document.getElementById('temperature').value = state.settings.temperature;
-  document.getElementById('temperature-value').innerText = state.settings.temperature;
-  document.getElementById('max-tokens').value = state.settings.maxTokens;
-  document.getElementById('max-tokens-value').innerText = `${state.settings.maxTokens} / ${document.getElementById('max-tokens').max}`;
+  geminiKey.value = state.settings.geminiKey;
+  openaiKey.value = state.settings.openaiKey;
+  systemPrompt.value = state.settings.systemPrompt;
+  temperature.value = state.settings.temperature;
+  temperatureValue.innerText = state.settings.temperature;
+  maxTokens.value = state.settings.maxTokens;
+  maxTokensValue.innerText = `${state.settings.maxTokens} / ${maxTokens.max}`;
 }
 
 function bindSettings() {
-  const provider = document.getElementById('provider');
-  const model = document.getElementById('model');
-  const geminiKey = document.getElementById('gemini-key');
-  const openaiKey = document.getElementById('openai-key');
-  const systemPrompt = document.getElementById('system-prompt');
-  const temperature = document.getElementById('temperature');
-  const maxTokens = document.getElementById('max-tokens');
-  const clearSystemPromptBtn = document.getElementById('clear-system-prompt-btn');
-  const systemPresetToggle = document.getElementById('system-preset-toggle');
+  const { provider, model, geminiKey, openaiKey, systemPrompt, temperature, maxTokens, clearSystemPromptBtn, systemPresetToggle, temperatureValue, maxTokensValue } = dom;
 
   provider.onchange = () => {
     state.settings.provider = provider.value;
@@ -335,12 +361,12 @@ function bindSettings() {
   systemPrompt.onchange = () => { state.settings.systemPrompt = systemPrompt.value; saveSettings(); };
   temperature.oninput = () => {
     state.settings.temperature = Number(temperature.value);
-    document.getElementById('temperature-value').innerText = temperature.value;
+    temperatureValue.innerText = temperature.value;
     saveSettings();
   };
   maxTokens.oninput = () => {
     state.settings.maxTokens = Number(maxTokens.value);
-    document.getElementById('max-tokens-value').innerText = `${maxTokens.value} / ${maxTokens.max}`;
+    maxTokensValue.innerText = `${maxTokens.value} / ${maxTokens.max}`;
     saveSettings();
   };
 
@@ -457,7 +483,7 @@ function deleteActiveSession() {
 function toggleSettings() { document.getElementById('settings-modal').classList.toggle('hidden'); }
 function toggleHistoryPanel() { document.getElementById('history-panel').classList.toggle('hidden'); }
 function updateModeButton() {
-  const btn = document.getElementById('mode-toggle-btn');
+  const { modeToggleBtn: btn } = dom;
   btn.innerHTML = document.documentElement.classList.contains('dark') ? '☀️ ライトモードへ' : '🌙 ダークモードへ';
 }
 function toggleDarkMode() { document.documentElement.classList.toggle('dark'); localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'; updateModeButton(); }
@@ -466,6 +492,19 @@ userInput.addEventListener('input', function () { this.style.height = 'auto'; th
 userInput.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } });
 
 window.addEventListener('DOMContentLoaded', () => {
+  dom.provider = document.getElementById('provider');
+  dom.model = document.getElementById('model');
+  dom.geminiKey = document.getElementById('gemini-key');
+  dom.openaiKey = document.getElementById('openai-key');
+  dom.systemPrompt = document.getElementById('system-prompt');
+  dom.temperature = document.getElementById('temperature');
+  dom.maxTokens = document.getElementById('max-tokens');
+  dom.temperatureValue = document.getElementById('temperature-value');
+  dom.maxTokensValue = document.getElementById('max-tokens-value');
+  dom.clearSystemPromptBtn = document.getElementById('clear-system-prompt-btn');
+  dom.systemPresetToggle = document.getElementById('system-preset-toggle');
+  dom.modeToggleBtn = document.getElementById('mode-toggle-btn');
+
   if (!state.sessions.length) startNewSession();
   if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id;
   updateModeButton();
