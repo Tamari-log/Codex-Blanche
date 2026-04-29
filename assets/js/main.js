@@ -5,6 +5,7 @@ const state = {
   sessions: JSON.parse(localStorage.getItem('codex_sessions') || '[]'),
   activeSessionId: localStorage.getItem('codex_active_session_id'),
   personas: JSON.parse(localStorage.getItem('codex_personas') || '[]'),
+  hiddenSystemPersonaIds: JSON.parse(localStorage.getItem('codex_hidden_system_persona_ids') || '[]'),
   settings: {
     provider: localStorage.getItem('provider') || 'gemini',
     geminiModel: localStorage.getItem('gemini_model') || 'gemini-3.1-pro-preview',
@@ -21,6 +22,32 @@ const CONTEXT_LIMITS = {
   gemini: 150000,
   openai: 50000,
 };
+
+
+
+const SYSTEM_PERSONAS = [
+  {
+    id: 'sys-neutral',
+    name: '標準',
+    settings: { systemPrompt: '' },
+  },
+  {
+    id: 'sys-creative',
+    name: '創作補助',
+    settings: {
+      temperature: 1.0,
+      systemPrompt: 'あなたは創作支援に強いアシスタントです。複数案を提示し、改善点を具体的に示してください。',
+    },
+  },
+  {
+    id: 'sys-concise',
+    name: '簡潔回答',
+    settings: {
+      temperature: 0.3,
+      systemPrompt: '要点を短く、箇条書き中心で回答してください。',
+    },
+  },
+];
 
 const MODEL_OPTIONS = {
   gemini: [
@@ -76,6 +103,7 @@ function persist() {
   localStorage.setItem('codex_sessions', JSON.stringify(state.sessions));
   localStorage.setItem('codex_personas', JSON.stringify(state.personas));
   localStorage.setItem('codex_active_session_id', state.activeSessionId || '');
+  localStorage.setItem('codex_hidden_system_persona_ids', JSON.stringify(state.hiddenSystemPersonaIds));
 }
 
 function startNewSession() {
@@ -140,20 +168,27 @@ function addBubble(text, role, index = null, editable = true) {
 function renderPersonaTabs() {
   const wrap = document.getElementById('persona-tabs');
   wrap.innerHTML = '';
-  state.personas.forEach((p, idx) => {
+
+  const systemPersonas = SYSTEM_PERSONAS.filter((p) => !state.hiddenSystemPersonaIds.includes(p.id));
+  const allPersonas = [
+    ...systemPersonas.map((p) => ({ ...p, isSystem: true })),
+    ...state.personas.map((p, idx) => ({ ...p, customIndex: idx, isSystem: false })),
+  ];
+
+  allPersonas.forEach((p) => {
     const btn = document.createElement('button');
     const group = document.createElement('div');
     group.className = 'flex items-center gap-1';
 
     btn.className = 'px-3 py-1 rounded-full text-sm border dark:text-white';
     btn.innerText = p.name;
-    btn.onclick = () => applyPersona(idx);
+    btn.onclick = () => applyPersona(p);
 
     const del = document.createElement('button');
     del.className = 'px-2 py-1 rounded-full text-xs border border-rose-400 text-rose-600 dark:text-rose-300';
     del.innerText = '×';
     del.title = `${p.name} を削除`;
-    del.onclick = () => deletePersona(idx);
+    del.onclick = () => deletePersona(p);
 
     group.appendChild(btn);
     group.appendChild(del);
@@ -161,10 +196,9 @@ function renderPersonaTabs() {
   });
 }
 
-function applyPersona(idx) {
-  const p = state.personas[idx];
-  if (!p) return;
-  state.settings = { ...state.settings, ...p.settings };
+function applyPersona(persona) {
+  if (!persona) return;
+  state.settings = { ...state.settings, ...persona.settings };
   applySettingsToUI();
   saveSettings();
 }
@@ -179,12 +213,17 @@ function savePersona() {
 }
 
 
-function deletePersona(idx) {
-  const persona = state.personas[idx];
+function deletePersona(persona) {
   if (!persona) return;
   const ok = window.confirm(`プリセット「${persona.name}」を削除しますか？`);
   if (!ok) return;
-  state.personas.splice(idx, 1);
+
+  if (persona.isSystem) {
+    state.hiddenSystemPersonaIds.push(persona.id);
+  } else if (typeof persona.customIndex === 'number') {
+    state.personas.splice(persona.customIndex, 1);
+  }
+
   persist();
   renderPersonaTabs();
 }
@@ -204,7 +243,7 @@ function formatAssistantError(error) {
   ];
   const isSafetyRefusal = safetyPatterns.some((pattern) => lowered.includes(pattern));
   if (isSafetyRefusal) {
-    return `⚠️ 安全機構エラー（AI出力拒否）: ${message}`;
+    return `【SAFETY_REFUSAL】AI安全機構により出力が拒否されました: ${message}`;
   }
   return `エラー：${message}`;
 }
