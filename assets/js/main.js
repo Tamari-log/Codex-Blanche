@@ -15,6 +15,10 @@ function saveHistory() {
 
 function renderHistory() {
     chatArea.innerHTML = '';
+    if (chatHistory.length === 0) {
+        addBubble('こんにちは。知恵の鏡へようこそ。', 'ai', null, false);
+        return;
+    }
     chatHistory.forEach((item, index) => {
         addBubble(item.text, item.role, index);
     });
@@ -22,12 +26,12 @@ function renderHistory() {
 }
 
 // 吹き出し（Bubble）から、エントリ（Entry）へ進化
-function addBubble(text, role, index = null) {
+function addBubble(text, role, index = null, editable = true) {
     const div = document.createElement('div');
     // CSSで定義した「紙の書き込み」スタイルを適用
     div.className = role === 'user' ? "user-msg" : "ai-msg";
     
-    div.contentEditable = true;
+    div.contentEditable = editable;
     div.innerText = text;
     
     div.onblur = () => {
@@ -67,6 +71,19 @@ userInput.addEventListener('input', function() {
     this.style.height = (this.scrollHeight) + 'px';
 });
 
+userInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+    }
+});
+
+userInput.addEventListener('focus', () => {
+    setTimeout(() => {
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }, 250);
+});
+
 function toggleSettings() {
     document.getElementById('settings-modal').classList.toggle('hidden');
 }
@@ -75,6 +92,8 @@ async function handleSend() {
     const text = userInput.value.trim();
     const key = apiKeyInput.value.trim();
     if (!text || !key) return;
+
+    userInput.disabled = true;
 
     chatHistory.push({ role: 'user', text: text });
     saveHistory();
@@ -92,6 +111,9 @@ async function handleSend() {
         renderHistory();
     } catch (e) {
         loading.innerText = "エラー：詠唱に失敗しました。";
+    } finally {
+        userInput.disabled = false;
+        userInput.focus();
     }
 }
 
