@@ -27,15 +27,29 @@ function renderHistory() {
     chatArea.scrollTop = chatArea.scrollHeight;
 }
 
-// 吹き出しを生成する（編集機能付き）
+// addBubble 関数内のクラス指定をシンプルに修正
 function addBubble(text, role, index = null) {
     const div = document.createElement('div');
     const isUser = role === 'user';
     
-    // CSSで定義したクラスを適用
+    // roleに応じたクラスだけを付与（右寄せクラスなどは削除）
     div.className = isUser ? "user-msg" : "ai-msg";
-    div.style.marginBottom = "1rem"; // 吹き出し間の余白
     
+    div.contentEditable = true;
+    div.innerText = text;
+    
+    div.onblur = () => {
+        if (index !== null && chatHistory[index]) {
+            chatHistory[index].text = div.innerText;
+            saveHistory();
+        }
+    };
+
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+    return div;
+}
+
     // 内容を編集可能にする
     div.contentEditable = true;
     div.innerText = text;
