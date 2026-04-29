@@ -17,6 +17,8 @@ const STORAGE_KEYS = {
   temperature: 'temperature',
   maxTokens: 'max_tokens',
   userSignature: 'user_signature',
+  localUpdatedAt: 'codex_local_updated_at',
+  lastRemoteModifiedAt: 'codex_last_remote_modified_at',
 };
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FOLDER_NAME = 'CodexBlanche';
@@ -108,6 +110,10 @@ const driveSync = {
     this.fileId = fileList.result.files?.[0]?.id || null;
   },
   payload() { return { sessions: state.sessions, personas: state.personas }; },
+  getLocalUpdatedAt() { return Number(localStorage.getItem(STORAGE_KEYS.localUpdatedAt) || 0); },
+  setLocalUpdatedAt(timestamp = Date.now()) { localStorage.setItem(STORAGE_KEYS.localUpdatedAt, String(timestamp)); },
+  getLastRemoteModifiedAt() { return Date.parse(localStorage.getItem(STORAGE_KEYS.lastRemoteModifiedAt) || '') || 0; },
+  setLastRemoteModifiedAt(isoTime = '') { if (isoTime) localStorage.setItem(STORAGE_KEYS.lastRemoteModifiedAt, isoTime); },
   hasSyncData() {
     const hasPersonas = state.personas.length > 0 || state.hiddenSystemPersonaIds.length > 0;
     const hasMessages = state.sessions.some((session) => (session.messages?.length || 0) > 0);
@@ -132,23 +138,35 @@ const driveSync = {
     const multipartBody = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
     await gapi.client.request({ path: this.fileId ? `/upload/drive/v3/files/${this.fileId}` : '/upload/drive/v3/files', method: this.fileId ? 'PATCH' : 'POST', params: { uploadType: 'multipart' }, headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body: multipartBody });
     if (!this.fileId) await this.ensureFolderAndFile();
+    const fileMeta = this.fileId ? await gapi.client.drive.files.get({ fileId: this.fileId, fields: 'modifiedTime' }) : null;
+    if (fileMeta?.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
     this.setStatus(`Drive: 同期済み ${new Date().toLocaleTimeString('ja-JP')}`);
   },
   async pull() {
     await this.ensureReady();
     if (!this.fileId) return;
+    const fileMeta = await gapi.client.drive.files.get({ fileId: this.fileId, fields: 'modifiedTime' });
+    const remoteModifiedAt = Date.parse(fileMeta.result?.modifiedTime || '') || 0;
+    const localUpdatedAt = this.getLocalUpdatedAt();
+    const lastRemoteModifiedAt = this.getLastRemoteModifiedAt();
+    const hasUnsyncedLocalChanges = localUpdatedAt > lastRemoteModifiedAt;
+    if (hasUnsyncedLocalChanges && localUpdatedAt > remoteModifiedAt) {
+      this.setStatus(`Drive: 取得を中止（ローカルが新しい） ${new Date().toLocaleTimeString('ja-JP')}`);
+      return;
+    }
     const r = await gapi.client.drive.files.get({ fileId: this.fileId, alt: 'media' });
     if (r.result?.sessions) state.sessions = r.result.sessions;
     if (r.result?.personas) state.personas = r.result.personas;
     if (!state.sessions.length) startNewSession();
     if (!state.activeSessionId || !state.sessions.find((s) => s.id === state.activeSessionId)) state.activeSessionId = state.sessions[0]?.id || null;
     await persistState({ syncDrive: false });
+    if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
     renderHistory(); renderSessionList(); renderPersonaTabs();
     this.setStatus(`Drive: 取得済み ${new Date().toLocaleTimeString('ja-JP')}`);
   },
 };
 
-async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); if (syncDrive && driveSync.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
+async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); driveSync.setLocalUpdatedAt(); if (syncDrive && driveSync.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
 
 // below mostly original
 function renderModelOptions() {
@@ -198,18 +216,12 @@ function saveSettings(){Object.entries({[STORAGE_KEYS.provider]:state.settings.p
 function applySettingsToUI(){syncContextSliderLimit();dom.provider.value=state.settings.provider;renderModelOptions();dom.geminiKey.value=state.settings.geminiKey;dom.openaiKey.value=state.settings.openaiKey;dom.googleClientId.value=state.settings.googleClientId;dom.systemPrompt.value=state.settings.systemPrompt;dom.userSignature.value=state.settings.userSignature;dom.temperature.value=state.settings.temperature;dom.temperatureValue.innerText=state.settings.temperature;dom.maxTokens.value=state.settings.maxTokens;dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}
 function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${e.message}`);}};googleLogoutBtn.onclick=async()=>{try{await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${e.message}`);}};}
 
-function wait(ms){return new Promise((resolve)=>setTimeout(resolve,ms));}
 async function revealWithQuillEffect(el,text){
-  el.innerText='';
-  const chars=Array.from(text||'');
-  for(let i=0;i<chars.length;i++){
-    el.innerText+=chars[i];
-    const c=chars[i];
-    const base=12+Math.random()*24;
-    const pause=/[、。！？!?…]/.test(c)?90:0;
-    await wait(base+pause);
-    chatArea.scrollTop=chatArea.scrollHeight;
-  }
+  el.classList.remove('reveal-fade-in');
+  el.innerText=text||'';
+  void el.offsetWidth;
+  el.classList.add('reveal-fade-in');
+  chatArea.scrollTop=chatArea.scrollHeight;
 }
 
 function renderSystemPresetPanel(){const p=document.getElementById('system-preset-panel');const t=document.getElementById('system-preset-toggle');p.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.setAttribute('aria-expanded',state.ui.showSystemPresetPanel?'true':'false');}

@@ -67,6 +67,15 @@ body { font-family: 'Noto Serif JP', serif; }
     color: #cbd5e1;
 }
 
+.reveal-fade-in {
+    animation: revealFadeIn 180ms ease-out;
+}
+
+@keyframes revealFadeIn {
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* 署名の追加（書物の題字風） */
 .user-msg::before,
 .ai-msg::before {
