@@ -275,3 +275,19 @@ body { font-family: 'Noto Serif JP', serif; }
     from { opacity: 0; transform: translateX(-12px); }
     to { opacity: 1; transform: translateX(0); }
 }
+
+.settings-action-btn {
+    transition: transform 0.12s ease, filter 0.2s ease, box-shadow 0.22s ease;
+}
+
+.settings-action-btn:active,
+.settings-action-btn.is-pressed {
+    transform: scale(0.96);
+    filter: brightness(1.08);
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.35);
+}
+
+.dark .settings-action-btn:active,
+.dark .settings-action-btn.is-pressed {
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.22);
+}
