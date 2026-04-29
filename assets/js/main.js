@@ -10,15 +10,30 @@ function toggleSettings() {
     document.getElementById('settings-modal').classList.toggle('hidden');
 }
 
-function addBubble(text, role) {
-    const div = document.createElement('div');
-    div.className = role === 'user' ? 
-        "bg-slate-700 text-white p-4 rounded-2xl rounded-tr-none ml-auto max-w-[85%] shadow-md mb-2" : 
-        "bg-slate-200 text-slate-800 p-4 rounded-2xl rounded-tl-none mr-auto max-w-[85%] shadow-sm mb-2";
-    div.innerText = text;
-    chatArea.appendChild(div);
-    chatArea.scrollTop = chatArea.scrollHeight;
-    return div;
+const userInput = document.getElementById('user-input');
+
+userInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+    
+    if (this.scrollHeight > 150) {
+        this.style.overflowY = 'scroll';
+        this.style.height = '150px';
+    } else {
+        this.style.overflowY = 'hidden';
+    }
+});
+
+async function handleSend() {
+    const text = userInput.value.trim();
+    const key = apiKeyInput.value.trim();
+    
+    if (!text || !key) return;
+
+    addBubble(text, 'user');
+    userInput.value = '';
+    userInput.style.height = 'auto'; // 高さを元に戻す
+    
 }
 
 async function handleSend() {

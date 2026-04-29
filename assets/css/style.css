@@ -43,3 +43,10 @@ body { font-family: 'Noto Serif JP', serif; }
     background: #334155;
     color: #f1f5f9;
 }
+
+#user-input {
+    min-height: 44px; /* 指でタップしやすい最小サイズ */
+    max-height: 150px;
+    line-height: 1.5;
+    transition: height 0.1s ease;
+}
