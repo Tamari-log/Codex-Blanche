@@ -68,8 +68,30 @@ body { font-family: 'Noto Serif JP', serif; }
 }
 
 /* 署名の追加（自動的に Blanche: と Codex: が付きます） */
-.user-msg::before { content: "Blanche:"; display: block; font-size: 0.6rem; opacity: 0.65; margin-bottom: 0.5rem; letter-spacing: 0.2rem; color: #5c3a1a; }
-.ai-msg::before { content: "Codex:"; display: block; font-size: 0.6rem; opacity: 0.65; margin-bottom: 0.5rem; letter-spacing: 0.2rem; color: #5c3a1a; }
+.user-msg::before,
+.ai-msg::before {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    opacity: 0.95;
+    margin-bottom: 0.55rem;
+    letter-spacing: 0.08rem;
+    color: #40260f;
+    background: rgba(255, 255, 255, 0.35);
+    border: 1px solid rgba(92, 58, 26, 0.25);
+    border-radius: 9999px;
+    padding: 0.12rem 0.52rem;
+}
+
+.user-msg::before { content: "Blanche:"; }
+.ai-msg::before { content: "Codex:"; }
+
+.dark .user-msg::before,
+.dark .ai-msg::before {
+    color: #f8fafc;
+    background: rgba(15, 23, 42, 0.7);
+    border-color: rgba(148, 163, 184, 0.45);
+}
 
 
 /* 編集中のスタイルも「紙に書き込んでいる」風に */
