@@ -48,6 +48,7 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: options.signal,
     headers: {
       'Content-Type': 'application/json',
       'x-goog-api-key': apiKey,
@@ -83,6 +84,7 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
+    signal: options.signal,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
