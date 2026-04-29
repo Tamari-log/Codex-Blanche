@@ -20,12 +20,14 @@
     <div class="app-shell flex flex-col h-[100dvh] max-w-md mx-auto shadow-2xl bg-[#f4f1ea] dark:bg-slate-800 transition-colors duration-300 overflow-hidden">
         <header class="pt-[env(safe-area-inset-top)] px-4 pb-4 border-b dark:border-slate-700 flex justify-between items-center bg-[#f4f1ea]/90 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-10">
             <h1 class="text-xl font-serif font-bold tracking-widest text-slate-700 dark:text-slate-200">CODEX BLANCHE</h1>
-            <button onclick="toggleSettings()" class="p-2 text-2xl grayscale dark:invert opacity-70">⚙️</button>
+            <div class="flex gap-2">
+                <button onclick="toggleHistoryPanel()" class="p-2 text-xl grayscale dark:invert opacity-70">📜</button>
+                <button onclick="toggleSettings()" class="p-2 text-2xl grayscale dark:invert opacity-70">⚙️</button>
+            </div>
         </header>
 
-        <main id="chat-area" class="flex-grow overflow-y-auto p-4 space-y-4 chat-bg scroll-smooth bg-transparent">
-            <div class="ai-msg shadow-sm border border-slate-100 dark:border-slate-700">こんにちは。知恵の鏡へようこそ。</div>
-        </main>
+        <div id="persona-tabs" class="px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex overflow-x-auto gap-2"></div>
+        <main id="chat-area" class="flex-grow overflow-y-auto p-4 space-y-4 chat-bg scroll-smooth bg-transparent"></main>
         <footer class="p-4 border-t dark:border-slate-700 bg-white dark:bg-slate-800 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
             <div class="grid grid-cols-10 gap-3 items-center">
                 <div class="col-span-8">
@@ -37,29 +39,40 @@
             </div>
         </footer>
 
+        <aside id="history-panel" class="hidden absolute inset-0 bg-black/60 z-40">
+            <div class="absolute right-0 top-0 h-full w-72 bg-white dark:bg-slate-900 p-4 overflow-y-auto">
+                <h3 class="font-bold dark:text-white mb-3">会話履歴</h3>
+                <div id="session-list" class="space-y-2"></div>
+                <button onclick="toggleHistoryPanel()" class="mt-4 w-full bg-slate-700 text-white rounded-lg py-2">閉じる</button>
+            </div>
+        </aside>
+
         <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-6">
-            <div class="bg-white dark:bg-slate-800 rounded-[2rem] p-8 w-full shadow-2xl border border-slate-200 dark:border-slate-700 transform transition-all scale-100">
+            <div class="bg-white dark:bg-slate-800 rounded-[2rem] p-6 w-full shadow-2xl border border-slate-200 dark:border-slate-700 transform transition-all scale-100 max-h-[90dvh] overflow-y-auto">
                 <h2 class="text-2xl font-serif font-bold mb-6 text-slate-800 dark:text-white text-center">写本の管理</h2>
-                
-                <div class="space-y-6">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest text-center">Appearance</label>
-                        <button onclick="toggleDarkMode()" id="mode-toggle-btn" class="w-full flex items-center justify-center gap-2 p-4 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold dark:text-white transition-all active:scale-95">
-                            </button>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest text-center">Gemini API Key</label>
-                        <input type="password" id="api-key" class="w-full border dark:border-slate-600 rounded-xl p-3 bg-slate-50 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-slate-400 outline-none" placeholder="Keyをここへ...">
-                    </div>
+                <div class="space-y-4">
+                    <button onclick="toggleDarkMode()" id="mode-toggle-btn" class="w-full p-3 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold dark:text-white"></button>
+                    <select id="provider" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white">
+                        <option value="gemini">Gemini</option>
+                        <option value="openai">ChatGPT (OpenAI)</option>
+                    </select>
+                    <input type="password" id="gemini-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Gemini API Key">
+                    <input type="password" id="openai-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="OpenAI API Key">
+                    <textarea id="system-prompt" rows="4" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="システムプロンプト"></textarea>
+                    <label class="text-sm dark:text-white">温度 <span id="temperature-value"></span></label>
+                    <input id="temperature" type="range" min="0" max="2" step="0.1" class="w-full">
+                    <label class="text-sm dark:text-white">コンテキスト長（トークン） <span id="max-tokens-value"></span></label>
+                    <input id="max-tokens" type="range" min="256" max="8192" step="256" class="w-full">
+                    <input id="persona-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="保存するプリセット名">
+                    <button onclick="savePersona()" class="w-full bg-indigo-600 text-white py-2 rounded-lg">プリセット保存</button>
+                    <button onclick="startNewSession()" class="w-full bg-slate-600 text-white py-2 rounded-lg">新規会話を開始</button>
                 </div>
-
-                <button onclick="toggleSettings()" class="w-full mt-8 bg-slate-800 dark:bg-white dark:text-slate-800 text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all">書庫に戻る</button>
+                <button onclick="toggleSettings()" class="w-full mt-6 bg-slate-800 dark:bg-white dark:text-slate-800 text-white py-3 rounded-2xl font-bold">書庫に戻る</button>
             </div>
         </div>
     </div>
 
-    <script src="assets/js/gemini.js"></script>
+    <script src="assets/js/providers.js"></script>
     <script src="assets/js/main.js"></script>
 </body>
 </html>
