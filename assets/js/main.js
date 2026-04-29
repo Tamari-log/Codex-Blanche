@@ -24,9 +24,9 @@ const CONTEXT_LIMITS = {
 
 const MODEL_OPTIONS = {
   gemini: [
-    { value: 'gemini-2.0-flash', label: 'gemini-2.0-flash（高速）' },
-    { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash（新しい高速）' },
-    { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro（高性能）' },
+    { value: 'gemini-3-flash-preview', label: 'gemini 3 flash（高速）' },
+    { value: 'gemini-3.1-flash-lite-preview', label: 'gemini 3.1 flash lite（新しい高速）' },
+    { value: 'gemini-3.1-pro-preview', label: 'gemini 3.1 pro（高性能）' },
   ],
   openai: [
     { value: 'gpt-4.1-mini', label: 'gpt-4.1-mini（高速）' },
