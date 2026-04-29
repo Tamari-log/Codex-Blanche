@@ -170,9 +170,7 @@ function addBubble(text, role, index = null, editable = true) {
 }
 
 function renderPersonaTabs() {
-  const customWrap = document.getElementById('persona-tabs');
   const systemWrap = document.getElementById('system-persona-tabs');
-  customWrap.innerHTML = '';
   systemWrap.innerHTML = '';
 
   const systemPersonas = SYSTEM_PERSONAS
@@ -200,11 +198,7 @@ function renderPersonaTabs() {
 
     group.appendChild(btn);
     group.appendChild(del);
-    if (p.isSystem) {
-      systemWrap.appendChild(group);
-    } else {
-      customWrap.appendChild(group);
-    }
+    systemWrap.appendChild(group);
   });
 }
 
@@ -215,6 +209,14 @@ function applyPersona(persona) {
   applySettingsToUI();
   saveSettings();
   renderPersonaTabs();
+  const tabButton = document.querySelector('.persona-tab-btn.active');
+  if (tabButton) {
+    tabButton.animate([
+      { transform: 'scale(1)', filter: 'brightness(1)' },
+      { transform: 'scale(1.06)', filter: 'brightness(1.2)' },
+      { transform: 'scale(1)', filter: 'brightness(1)' },
+    ], { duration: 220, easing: 'ease-out' });
+  }
 }
 
 function savePersona() {
@@ -357,10 +359,9 @@ function bindSettings() {
 function renderSystemPresetPanel() {
   const panel = document.getElementById('system-preset-panel');
   const toggle = document.getElementById('system-preset-toggle');
-  panel.classList.toggle('hidden', !state.ui.showSystemPresetPanel);
+  panel.classList.toggle('is-open', state.ui.showSystemPresetPanel);
   toggle.classList.toggle('is-open', state.ui.showSystemPresetPanel);
   toggle.setAttribute('aria-expanded', state.ui.showSystemPresetPanel ? 'true' : 'false');
-  toggle.innerText = state.ui.showSystemPresetPanel ? 'システムプリセット ▼' : 'システムプリセット ▶';
 }
 
 async function handleSend() {
