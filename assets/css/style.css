@@ -91,19 +91,21 @@ body { font-family: 'Noto Serif JP', serif; }
 
 .preset-toggle-btn {
     border: 1px solid #b89d74;
-    border-radius: 9999px;
-    padding: 0.35rem 0.8rem;
-    font-size: 0.85rem;
-    color: #40260f;
+    border-radius: 0.75rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.28rem;
     background: rgba(255, 255, 255, 0.55);
     transition: all 0.2s ease;
-    white-space: nowrap;
 }
 
 .preset-toggle-btn.is-open {
     background: #7b4f24;
-    color: #fff;
-    transform: translateX(3px);
+    transform: translateX(2px);
 }
 
 .dark .preset-toggle-btn {
@@ -117,7 +119,52 @@ body { font-family: 'Noto Serif JP', serif; }
 }
 
 .system-preset-panel {
-    animation: slideIn 0.22s ease;
+    position: fixed;
+    left: 0;
+    top: calc(env(safe-area-inset-top) + 4.7rem);
+    width: min(88vw, 22rem);
+    max-height: 70dvh;
+    overflow-y: auto;
+    z-index: 30;
+    border-radius: 0 1rem 1rem 0;
+    background: rgba(232, 216, 179, 0.98);
+    border: 1px solid #b89d74;
+    box-shadow: 0 12px 28px rgba(64, 38, 15, 0.2);
+    transform: translateX(-105%);
+    transition: transform 0.28s ease;
+}
+
+.dark .system-preset-panel {
+    background: rgba(30, 41, 59, 0.98);
+    border-color: #475569;
+}
+
+.system-preset-panel.is-open {
+    transform: translateX(0);
+}
+
+.hamburger-line {
+    width: 1.2rem;
+    height: 2px;
+    background: #40260f;
+    border-radius: 9999px;
+    transition: transform 0.28s ease, opacity 0.28s ease, background 0.2s ease;
+}
+
+.dark .hamburger-line {
+    background: #f8fafc;
+}
+
+.preset-toggle-btn.is-open .hamburger-line:nth-child(1) {
+    transform: translateY(0.4rem) rotate(45deg);
+}
+
+.preset-toggle-btn.is-open .hamburger-line:nth-child(2) {
+    opacity: 0;
+}
+
+.preset-toggle-btn.is-open .hamburger-line:nth-child(3) {
+    transform: translateY(-0.4rem) rotate(-45deg);
 }
 
 .persona-tab-btn {
@@ -137,6 +184,10 @@ body { font-family: 'Noto Serif JP', serif; }
     color: #fff;
     box-shadow: 0 0 0 2px rgba(123, 79, 36, 0.22);
     transform: translateY(-1px) scale(1.03);
+}
+
+.persona-tab-btn:active {
+    transform: scale(0.96);
 }
 
 .dark .persona-tab-btn {
