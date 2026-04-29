@@ -33,14 +33,36 @@ const MODEL_OPTIONS = { gemini: [{ value: 'gemini-3-flash-preview', label: 'gemi
 
 const driveSync = {
   tokenClient: null, accessToken: null, folderId: null, fileId: null,
+  _initPromise: null,
   setStatus(text) { if (dom.driveStatus) dom.driveStatus.textContent = text; },
-  async init() {
-    if (!window.google?.accounts?.oauth2 || !window.gapi) return;
-    await new Promise((resolve) => gapi.load('client', resolve));
-    await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
-    this.setStatus('Drive: Client準備完了（未接続）');
+  async waitForGoogleLibs(timeoutMs = 10000) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (window.gapi && window.google?.accounts?.oauth2) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error('Google API ライブラリの読み込みがタイムアウトしました');
   },
-  ensureTokenClient() {
+  async init() {
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = (async () => {
+      await this.waitForGoogleLibs();
+      await new Promise((resolve, reject) => {
+        gapi.load('client', {
+          callback: resolve,
+          onerror: () => reject(new Error('gapi client のロードに失敗しました')),
+          timeout: 5000,
+          ontimeout: () => reject(new Error('gapi client のロードがタイムアウトしました')),
+        });
+      });
+      await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+      if (!gapi.client.drive?.files) throw new Error('Drive API の初期化に失敗しました');
+      this.setStatus('Drive: Client準備完了（未接続）');
+    })();
+    return this._initPromise;
+  },
+  async ensureTokenClient() {
+    await this.init();
     if (!state.settings.googleClientId) throw new Error('Google Client ID を設定してください');
     if (!window.google?.accounts?.oauth2) throw new Error('Google Identity Services が未読み込みです');
     if (!this.tokenClient) {
@@ -57,7 +79,7 @@ const driveSync = {
     }
   },
   async signIn(interactive = true) {
-    this.ensureTokenClient();
+    await this.ensureTokenClient();
     await new Promise((resolve, reject) => {
       const prev = this.tokenClient.callback;
       this.tokenClient.callback = (resp) => {
@@ -71,8 +93,8 @@ const driveSync = {
       this.tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
     });
   },
-  signOut() { this.accessToken = null; gapi.client.setToken(null); this.setStatus('Drive: 未接続'); },
-  async ensureReady() { if (!this.accessToken) await this.signIn(false); await this.ensureFolderAndFile(); },
+  async signOut() { await this.init(); this.accessToken = null; gapi.client.setToken(null); this.setStatus('Drive: 未接続'); },
+  async ensureReady() { await this.init(); if (!this.accessToken) await this.signIn(false); await this.ensureFolderAndFile(); },
   async ensureFolderAndFile() {
     const folderQ = `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
     const folder = await gapi.client.drive.files.list({ q: folderQ, fields: 'files(id,name)' });
@@ -126,7 +148,7 @@ async function deletePersona(persona){if(!persona||!window.confirm(`プリセッ
 function renderSessionList(){const list=document.getElementById('session-list');list.innerHTML='';state.sessions.forEach((s)=>{const btn=document.createElement('button');btn.className='w-full text-left p-2 rounded border dark:text-white';btn.innerText=s.title;btn.onclick=()=>{state.activeSessionId=s.id;persistState();renderHistory();toggleHistoryPanel();};list.appendChild(btn);});}
 function saveSettings(){Object.entries({[STORAGE_KEYS.provider]:state.settings.provider,[STORAGE_KEYS.geminiModel]:state.settings.geminiModel,[STORAGE_KEYS.openaiModel]:state.settings.openaiModel,[STORAGE_KEYS.geminiKey]:state.settings.geminiKey,[STORAGE_KEYS.openaiKey]:state.settings.openaiKey,[STORAGE_KEYS.googleClientId]:state.settings.googleClientId,[STORAGE_KEYS.systemPrompt]:state.settings.systemPrompt,[STORAGE_KEYS.userSignature]:state.settings.userSignature,[STORAGE_KEYS.temperature]:state.settings.temperature,[STORAGE_KEYS.maxTokens]:state.settings.maxTokens}).forEach(([k,v])=>localStorage.setItem(k,v));}
 function applySettingsToUI(){syncContextSliderLimit();dom.provider.value=state.settings.provider;renderModelOptions();dom.geminiKey.value=state.settings.geminiKey;dom.openaiKey.value=state.settings.openaiKey;dom.googleClientId.value=state.settings.googleClientId;dom.systemPrompt.value=state.settings.systemPrompt;dom.userSignature.value=state.settings.userSignature;dom.temperature.value=state.settings.temperature;dom.temperatureValue.innerText=state.settings.temperature;dom.maxTokens.value=state.settings.maxTokens;dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}
-function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${e.message}`);}};googleLogoutBtn.onclick=()=>driveSync.signOut();}
+function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${e.message}`);}};googleLogoutBtn.onclick=async()=>{try{await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${e.message}`);}};}
 function renderSystemPresetPanel(){const p=document.getElementById('system-preset-panel');const t=document.getElementById('system-preset-toggle');p.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.setAttribute('aria-expanded',state.ui.showSystemPresetPanel?'true':'false');}
 async function handleSend(){const text=userInput.value.trim();if(!text)return;const s=getActiveSession();if(!s)return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;userInput.disabled=true;s.messages.push({role:'user',text});await persistState();renderHistory();userInput.value='';const loading=addBubble('思索中...','ai');try{const reply=await generateAssistantReply([...s.messages],apiKey);s.messages.push({role:'ai',text:reply});await persistState();renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;}finally{userInput.disabled=false;userInput.focus();}}
 async function generateAssistantReply(messages, apiKey) { return state.settings.provider === 'gemini' ? callGeminiAPI(messages, apiKey, { model: state.settings.geminiModel, temperature: state.settings.temperature, maxTokens: state.settings.maxTokens, systemInstruction: state.settings.systemPrompt }) : callOpenAIAPI([...(state.settings.systemPrompt ? [{ role: 'system', text: state.settings.systemPrompt }] : []), ...messages], apiKey, { model: state.settings.openaiModel, temperature: state.settings.temperature, maxTokens: state.settings.maxTokens }); }
