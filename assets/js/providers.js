@@ -1,14 +1,19 @@
 async function callGeminiAPI(messages, apiKey, options = {}) {
-  const model = options.model || 'gemini-1.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const model = options.model || 'gemini-2.0-flash';
+  const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
 
   const systemMessage = messages.find((msg) => msg.role === 'system')?.text || '';
   const contents = messages
     .filter((msg) => msg.role !== 'system')
+    .filter((msg) => typeof msg.text === 'string' && msg.text.trim().length > 0)
     .map((msg) => ({
       role: msg.role === 'ai' ? 'model' : 'user',
       parts: [{ text: msg.text }],
     }));
+
+  if (!contents.length) {
+    throw new Error('送信するメッセージが空です');
+  }
 
   const body = {
     contents,
@@ -28,7 +33,16 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     body: JSON.stringify(body),
   });
 
-  if (!response.ok) throw new Error('Gemini API request failed');
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const err = await response.json();
+      detail = err?.error?.message || JSON.stringify(err);
+    } catch {
+      detail = await response.text();
+    }
+    throw new Error(`Gemini API request failed (${response.status}): ${detail}`);
+  }
   const data = await response.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text || '応答を取得できませんでした。';
 }
