@@ -7,6 +7,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Codex Blanche</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="icon" type="image/png" href="./icon.png">
     <link rel="apple-touch-icon" href="./icon.png">
@@ -24,6 +26,7 @@
         <header class="pt-[env(safe-area-inset-top)] px-4 pb-4 border-b dark:border-slate-700 flex justify-between items-center bg-[#e8d8b3]/90 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-10">
             <h1 class="text-xl font-serif font-bold tracking-widest text-[#40260f] dark:text-slate-200">CODEX BLANCHE</h1>
             <div class="flex gap-2">
+                <button id="drive-sync-btn" onclick="syncWithDrive()" class="p-2 text-xl grayscale dark:invert opacity-70" title="Googleドライブ同期">☁️</button>
                 <button onclick="toggleHistoryPanel()" class="p-2 text-xl grayscale dark:invert opacity-70">📜</button>
                 <button onclick="toggleSettings()" class="p-2 text-2xl grayscale dark:invert opacity-70">⚙️</button>
             </div>
@@ -74,6 +77,12 @@
                     <select id="model" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white"></select>
                     <input type="password" id="gemini-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Gemini API Key">
                     <input type="password" id="openai-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="OpenAI API Key">
+                    <input id="google-client-id" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Google Client ID">
+                    <div class="flex gap-2">
+                        <button id="google-login-btn" class="flex-1 bg-emerald-700 text-white py-2 rounded-lg">Google接続</button>
+                        <button id="google-logout-btn" class="flex-1 bg-slate-500 text-white py-2 rounded-lg">接続解除</button>
+                    </div>
+                    <p id="drive-status" class="text-xs text-slate-600 dark:text-slate-300">Drive: 未接続</p>
                     <div class="space-y-2">
                         <textarea id="system-prompt" rows="4" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="システムプロンプト"></textarea>
                         <button id="clear-system-prompt-btn" class="w-full bg-slate-200 dark:bg-slate-700 dark:text-white py-2 rounded-lg">システムプロンプトを空にする</button>
