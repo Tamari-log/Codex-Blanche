@@ -185,7 +185,6 @@ function addBubble(text, role, index = null, editable = true) {
 }
 
 function renderPersonaTabs() {
-  ui.systemPersonaTabs.innerHTML = '';
 
   const systemPersonas = SYSTEM_PERSONAS
     .filter((p) => !state.hiddenSystemPersonaIds.includes(p.id))
@@ -212,7 +211,7 @@ function renderPersonaTabs() {
 
     group.appendChild(btn);
     group.appendChild(del);
-    ui.systemPersonaTabs.appendChild(group);
+
   });
 }
 
@@ -312,8 +311,7 @@ function applySettingsToUI() {
 }
 
 function bindSettings() {
-  ui.provider.onchange = () => {
-    state.settings.provider = ui.provider.value;
+
     syncContextSliderLimit();
     applySettingsToUI();
     saveSettings();
@@ -340,24 +338,14 @@ function bindSettings() {
     saveSettings();
   };
 
-  ui.clearSystemPromptBtn.onclick = () => {
-    state.settings.systemPrompt = '';
-    ui.systemPrompt.value = '';
-    saveSettings();
-  };
 
-  ui.systemPresetToggle.onclick = () => {
     state.ui.showSystemPresetPanel = !state.ui.showSystemPresetPanel;
     renderSystemPresetPanel();
   };
 }
 
 function renderSystemPresetPanel() {
-  ui.systemPresetPanel.classList.toggle('hidden', !state.ui.showSystemPresetPanel);
-  ui.systemPresetToggle.classList.toggle('is-open', state.ui.showSystemPresetPanel);
-  ui.systemPresetToggle.setAttribute('aria-expanded', state.ui.showSystemPresetPanel ? 'true' : 'false');
-  ui.systemPresetToggle.innerText = '☰';
-}
+
 
 async function handleSend() {
   const text = userInput.value.trim();
