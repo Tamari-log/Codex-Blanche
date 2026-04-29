@@ -1,18 +1,39 @@
+function normalizeGeminiContents(messages) {
+  const normalized = [];
+
+  messages
+    .filter((msg) => msg.role !== 'system')
+    .filter((msg) => typeof msg.text === 'string' && msg.text.trim().length > 0)
+    .forEach((msg) => {
+      const role = msg.role === 'ai' ? 'model' : 'user';
+      const text = msg.text.trim();
+      const prev = normalized[normalized.length - 1];
+
+      if (prev && prev.role === role) {
+        prev.parts[0].text = `${prev.parts[0].text}\n\n${text}`;
+      } else {
+        normalized.push({ role, parts: [{ text }] });
+      }
+    });
+
+  while (normalized.length && normalized[0].role !== 'user') {
+    normalized.shift();
+  }
+
+  return normalized;
+}
+
 async function callGeminiAPI(messages, apiKey, options = {}) {
   const model = options.model || 'gemini-3.1-pro-preview';
   const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
 
-  const systemMessage = messages.find((msg) => msg.role === 'system')?.text || '';
-  const contents = messages
-    .filter((msg) => msg.role !== 'system')
-    .filter((msg) => typeof msg.text === 'string' && msg.text.trim().length > 0)
-    .map((msg) => ({
-      role: msg.role === 'ai' ? 'model' : 'user',
-      parts: [{ text: msg.text }],
-    }));
+  const systemMessage = options.systemInstruction
+    || messages.find((msg) => msg.role === 'system')?.text
+    || '';
+  const contents = normalizeGeminiContents(messages);
 
   if (!contents.length) {
-    throw new Error('送信するメッセージが空です');
+    throw new Error('Gemini向けの履歴が不正です（最初の発話はユーザーである必要があります）');
   }
 
   const body = {
