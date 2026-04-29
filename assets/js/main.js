@@ -44,12 +44,22 @@ async function handleSend() {
 // Enterキー対応
 userInput.onkeypress = (e) => { if(e.key === 'Enter') handleSend(); };
 
-function toggleDarkMode() {
+function updateModeButton() {
+    const btn = document.getElementById('mode-toggle-btn');
+    if (!btn) return;
     if (document.documentElement.classList.contains('dark')) {
-        document.documentElement.classList.remove('dark');
-        localStorage.theme = 'light';
+        btn.innerHTML = '☀️ ライトモードへ';
     } else {
-        document.documentElement.classList.add('dark');
-        localStorage.theme = 'dark';
+        btn.innerHTML = '🌙 ダークモードへ';
     }
 }
+
+// 既存の toggleDarkMode の最後に updateModeButton() を呼ぶ
+function toggleDarkMode() {
+    document.documentElement.classList.toggle('dark');
+    localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    updateModeButton();
+}
+
+// 起動時にボタンを正しく表示
+window.addEventListener('DOMContentLoaded', updateModeButton);
