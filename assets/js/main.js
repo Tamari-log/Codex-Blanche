@@ -15,6 +15,21 @@ const state = {
   },
 };
 
+const CONTEXT_LIMITS = {
+  gemini: 150000,
+  openai: 50000,
+};
+
+function syncContextSliderLimit() {
+  const maxTokens = document.getElementById('max-tokens');
+  const limit = CONTEXT_LIMITS[state.settings.provider] || 8192;
+  maxTokens.max = String(limit);
+  if (state.settings.maxTokens > limit) {
+    state.settings.maxTokens = limit;
+    saveSettings();
+  }
+}
+
 function getActiveSession() {
   return state.sessions.find((s) => s.id === state.activeSessionId);
 }
@@ -117,6 +132,7 @@ function saveSettings() {
 }
 
 function applySettingsToUI() {
+  syncContextSliderLimit();
   document.getElementById('provider').value = state.settings.provider;
   document.getElementById('gemini-key').value = state.settings.geminiKey;
   document.getElementById('openai-key').value = state.settings.openaiKey;
@@ -124,7 +140,7 @@ function applySettingsToUI() {
   document.getElementById('temperature').value = state.settings.temperature;
   document.getElementById('temperature-value').innerText = state.settings.temperature;
   document.getElementById('max-tokens').value = state.settings.maxTokens;
-  document.getElementById('max-tokens-value').innerText = state.settings.maxTokens;
+  document.getElementById('max-tokens-value').innerText = `${state.settings.maxTokens} / ${document.getElementById('max-tokens').max}`;
 }
 
 function bindSettings() {
@@ -135,7 +151,12 @@ function bindSettings() {
   const temperature = document.getElementById('temperature');
   const maxTokens = document.getElementById('max-tokens');
 
-  provider.onchange = () => { state.settings.provider = provider.value; saveSettings(); };
+  provider.onchange = () => {
+    state.settings.provider = provider.value;
+    syncContextSliderLimit();
+    applySettingsToUI();
+    saveSettings();
+  };
   geminiKey.onchange = () => { state.settings.geminiKey = geminiKey.value.trim(); saveSettings(); };
   openaiKey.onchange = () => { state.settings.openaiKey = openaiKey.value.trim(); saveSettings(); };
   systemPrompt.onchange = () => { state.settings.systemPrompt = systemPrompt.value; saveSettings(); };
@@ -146,7 +167,7 @@ function bindSettings() {
   };
   maxTokens.oninput = () => {
     state.settings.maxTokens = Number(maxTokens.value);
-    document.getElementById('max-tokens-value').innerText = maxTokens.value;
+    document.getElementById('max-tokens-value').innerText = `${maxTokens.value} / ${maxTokens.max}`;
     saveSettings();
   };
 }

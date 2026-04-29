@@ -62,7 +62,7 @@
                     <label class="text-sm dark:text-white">温度 <span id="temperature-value"></span></label>
                     <input id="temperature" type="range" min="0" max="2" step="0.1" class="w-full">
                     <label class="text-sm dark:text-white">コンテキスト長（トークン） <span id="max-tokens-value"></span></label>
-                    <input id="max-tokens" type="range" min="256" max="8192" step="256" class="w-full">
+                    <input id="max-tokens" type="range" min="256" max="150000" step="256" class="w-full">
                     <input id="persona-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="保存するプリセット名">
                     <button onclick="savePersona()" class="w-full bg-indigo-600 text-white py-2 rounded-lg">プリセット保存</button>
                     <button onclick="startNewSession()" class="w-full bg-slate-600 text-white py-2 rounded-lg">新規会話を開始</button>
