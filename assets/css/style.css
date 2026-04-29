@@ -6,6 +6,17 @@ body { font-family: 'Noto Serif JP', serif; }
     background-image: url('https://www.transparenttextures.com/patterns/paper.png');
 }
 
+/* チャットエリア（mainタグ）の調整 */
+#chat-area {
+    /* ヘッダーのすぐ下に文字が来ないよう、上部に大きな余白を作る */
+    padding-top: 2rem; 
+    
+    /* 羊皮紙テクスチャの設定（白飛びしないように調整） */
+    background-image: url('https://www.transparenttextures.com/patterns/paper.png');
+    background-blend-mode: multiply; /* 下地のセピア色と画像を合成する */
+    background-color: transparent !important;
+}
+
 /* ユーザーの発言：力強い筆跡 */
 .user-msg {
     color: #1e293b;
@@ -48,3 +59,8 @@ body { font-family: 'Noto Serif JP', serif; }
     background-color: rgba(30, 41, 59, 0.9);
 }
 
+/* ダークモード時の背景調整（既存のものを補強） */
+.dark #chat-area {
+    background-color: #0f172a !important; /* 深い紺色 */
+    background-image: url('https://www.transparenttextures.com/patterns/dark-matter.png');
+}
