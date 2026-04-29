@@ -43,6 +43,7 @@
             <div class="absolute right-0 top-0 h-full w-72 bg-white dark:bg-slate-900 p-4 overflow-y-auto">
                 <h3 class="font-bold dark:text-white mb-3">会話履歴</h3>
                 <div id="session-list" class="space-y-2"></div>
+                <button onclick="deleteActiveSession()" class="mt-4 w-full bg-rose-700 text-white rounded-lg py-2">この会話を削除</button>
                 <button onclick="toggleHistoryPanel()" class="mt-4 w-full bg-slate-700 text-white rounded-lg py-2">閉じる</button>
             </div>
         </aside>
@@ -67,6 +68,7 @@
                     <input id="persona-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="保存するプリセット名">
                     <button onclick="savePersona()" class="w-full bg-indigo-600 text-white py-2 rounded-lg">プリセット保存</button>
                     <button onclick="startNewSession()" class="w-full bg-slate-600 text-white py-2 rounded-lg">新規会話を開始</button>
+                    <button onclick="deleteActiveSession()" class="w-full bg-rose-700 text-white py-2 rounded-lg">現在の会話を削除</button>
                 </div>
                 <button onclick="toggleSettings()" class="w-full mt-6 bg-slate-800 dark:bg-white dark:text-slate-800 text-white py-3 rounded-2xl font-bold">書庫に戻る</button>
             </div>

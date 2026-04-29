@@ -98,6 +98,8 @@ function renderHistory() {
 }
 
 function addBubble(text, role, index = null, editable = true) {
+  const wrap = document.createElement('div');
+  wrap.className = 'space-y-1';
   const div = document.createElement('div');
   div.className = role === 'user' ? 'user-msg' : 'ai-msg';
   div.contentEditable = editable;
@@ -109,9 +111,30 @@ function addBubble(text, role, index = null, editable = true) {
       persist();
     }
   };
-  chatArea.appendChild(div);
+  wrap.appendChild(div);
+
+  if (index !== null) {
+    const controls = document.createElement('div');
+    controls.className = 'flex justify-end gap-2 text-xs';
+    const del = document.createElement('button');
+    del.className = 'px-2 py-1 rounded bg-slate-700 text-white';
+    del.innerText = '削除';
+    del.onclick = () => deleteMessage(index);
+    controls.appendChild(del);
+
+    if (role === 'ai') {
+      const retry = document.createElement('button');
+      retry.className = 'px-2 py-1 rounded bg-indigo-600 text-white';
+      retry.innerText = 'やり直し';
+      retry.onclick = () => regenerateAt(index);
+      controls.appendChild(retry);
+    }
+    wrap.appendChild(controls);
+  }
+
+  chatArea.appendChild(wrap);
   chatArea.scrollTop = chatArea.scrollHeight;
-  return div;
+  return { wrap, div };
 }
 
 function renderPersonaTabs() {
@@ -240,30 +263,76 @@ async function handleSend() {
   const loading = addBubble('思索中...', 'ai');
   try {
     const messages = [...session.messages];
-    const reply = state.settings.provider === 'gemini'
-      ? await callGeminiAPI(messages, apiKey, {
-        model: state.settings.geminiModel,
-        temperature: state.settings.temperature,
-        maxTokens: state.settings.maxTokens,
-        systemInstruction: state.settings.systemPrompt,
-      })
-      : await callOpenAIAPI([
-        ...(state.settings.systemPrompt ? [{ role: 'system', text: state.settings.systemPrompt }] : []),
-        ...messages,
-      ], apiKey, {
-        model: state.settings.openaiModel,
-        temperature: state.settings.temperature,
-        maxTokens: state.settings.maxTokens,
-      });
+    const reply = await generateAssistantReply(messages, apiKey);
     session.messages.push({ role: 'ai', text: reply });
     persist();
     renderHistory();
   } catch (e) {
-    loading.innerText = `エラー：${e.message}`;
+    loading.div.innerText = `エラー：${e.message}`;
   } finally {
     userInput.disabled = false;
     userInput.focus();
   }
+}
+
+async function generateAssistantReply(messages, apiKey) {
+  return state.settings.provider === 'gemini'
+    ? callGeminiAPI(messages, apiKey, {
+      model: state.settings.geminiModel,
+      temperature: state.settings.temperature,
+      maxTokens: state.settings.maxTokens,
+      systemInstruction: state.settings.systemPrompt,
+    })
+    : callOpenAIAPI([
+      ...(state.settings.systemPrompt ? [{ role: 'system', text: state.settings.systemPrompt }] : []),
+      ...messages,
+    ], apiKey, {
+      model: state.settings.openaiModel,
+      temperature: state.settings.temperature,
+      maxTokens: state.settings.maxTokens,
+    });
+}
+
+function deleteMessage(index) {
+  const session = getActiveSession();
+  if (!session?.messages[index]) return;
+  session.messages.splice(index, 1);
+  persist();
+  renderHistory();
+}
+
+async function regenerateAt(index) {
+  const session = getActiveSession();
+  if (!session?.messages[index] || session.messages[index].role !== 'ai') return;
+  const apiKey = state.settings.provider === 'gemini' ? state.settings.geminiKey : state.settings.openaiKey;
+  if (!apiKey) return;
+  const contextMessages = session.messages.slice(0, index);
+  session.messages = contextMessages;
+  persist();
+  renderHistory();
+  const loading = addBubble('思索中...', 'ai');
+  try {
+    const reply = await generateAssistantReply(contextMessages, apiKey);
+    session.messages.push({ role: 'ai', text: reply });
+    persist();
+    renderHistory();
+  } catch (e) {
+    loading.div.innerText = `エラー：${e.message}`;
+  }
+}
+
+function deleteActiveSession() {
+  const session = getActiveSession();
+  if (!session) return;
+  state.sessions = state.sessions.filter((s) => s.id !== session.id);
+  if (state.sessions.length === 0) {
+    startNewSession();
+    return;
+  }
+  state.activeSessionId = state.sessions[0].id;
+  persist();
+  renderHistory();
+  renderSessionList();
 }
 
 function toggleSettings() { document.getElementById('settings-modal').classList.toggle('hidden'); }
