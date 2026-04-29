@@ -108,8 +108,24 @@ const driveSync = {
     this.fileId = fileList.result.files?.[0]?.id || null;
   },
   payload() { return { sessions: state.sessions, personas: state.personas }; },
+  hasSyncData() {
+    const hasPersonas = state.personas.length > 0 || state.hiddenSystemPersonaIds.length > 0;
+    const hasMessages = state.sessions.some((session) => (session.messages?.length || 0) > 0);
+    return hasPersonas || hasMessages;
+  },
+  async deleteRemoteFile() {
+    await this.ensureReady();
+    if (!this.fileId) return;
+    await gapi.client.drive.files.delete({ fileId: this.fileId });
+    this.fileId = null;
+    this.setStatus(`Drive: ファイル削除済み ${new Date().toLocaleTimeString('ja-JP')}`);
+  },
   async push() {
     await this.ensureReady();
+    if (!this.hasSyncData()) {
+      await this.deleteRemoteFile();
+      return;
+    }
     const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [this.folderId] };
     const boundary = 'foo_bar_baz';
     const body = JSON.stringify(this.payload());
