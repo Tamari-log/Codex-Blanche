@@ -2,72 +2,40 @@
 
 body { font-family: 'Noto Serif JP', serif; }
 
-/* 背景の定義 */
 .chat-bg {
-    background-color: #f8fafc;
     background-image: url('https://www.transparenttextures.com/patterns/paper.png');
 }
 
-.dark .chat-bg {
-    background-color: #0f172a; /* ダーク時のベース色 */
-    background-image: url('https://www.transparenttextures.com/patterns/dark-matter.png');
-    background-blend-mode: multiply;
-}
-
-/* AIメッセージの調整 */
-/* 吹き出し（Bubble）の概念を消去し、テキスト行（Entry）にする */
-.ai-msg, .user-msg {
-    max-width: 100%; /* 横幅いっぱい使う */
-    padding: 0.8rem 0; /* 上下の余白のみ */
-    font-size: 1.05rem;
-    line-height: 1.8;
-    position: relative;
-    margin-bottom: 1.5rem;
-}
-
-/* ユーザーの書き込み（右寄せせず、左側から「筆跡」を変える） */
+/* ユーザーの発言：力強い筆跡 */
 .user-msg {
     color: #1e293b;
-    font-weight: bold;
-    border-left: 3px solid #94a3b8 !important; /* 左側に細い縦線で「発言者」を区別 */
+    font-weight: 700;
     padding-left: 1rem;
+    border-left: 4px solid #64748b;
+    margin-bottom: 2rem;
 }
 
 .dark .user-msg {
-    color: #e2e8f0;
-    border-left: 3px solid #475569 !important;
+    color: #f1f5f9;
+    border-left-color: #94a3b8;
 }
 
-/* AIの書き込み（より「記録」らしい落ち着いた色） */
+/* AIの返答：流麗な記録 */
 .ai-msg {
     color: #334155;
     padding-left: 1rem;
+    margin-bottom: 2rem;
+    line-height: 2;
 }
 
 .dark .ai-msg {
     color: #cbd5e1;
 }
 
-/* 「誰が書いたか」を小さな添え字で表現する（オプション） */
-.user-msg::before {
-    content: "Blanche:";
-    display: block;
-    font-size: 0.7rem;
-    letter-spacing: 0.1rem;
-    text-transform: uppercase;
-    opacity: 0.5;
-    margin-bottom: 0.2rem;
-}
+/* 署名の追加（自動的に Blanche: と Codex: が付きます） */
+.user-msg::before { content: "Blanche:"; display: block; font-size: 0.6rem; opacity: 0.5; margin-bottom: 0.5rem; letter-spacing: 0.2rem; }
+.ai-msg::before { content: "Codex:"; display: block; font-size: 0.6rem; opacity: 0.5; margin-bottom: 0.5rem; letter-spacing: 0.2rem; }
 
-.ai-msg::before {
-    content: "Codex:";
-    display: block;
-    font-size: 0.7rem;
-    letter-spacing: 0.1rem;
-    text-transform: uppercase;
-    opacity: 0.5;
-    margin-bottom: 0.2rem;
-}
 
 /* 編集中のスタイルも「紙に書き込んでいる」風に */
 [contenteditable="true"]:focus {
