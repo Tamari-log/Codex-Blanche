@@ -1,5 +1,5 @@
 async function callGeminiAPI(messages, apiKey, options = {}) {
-  const model = options.model || 'gemini-2.0-flash';
+  const model = options.model || 'gemini-3.1-pro-preview';
   const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
 
   const systemMessage = messages.find((msg) => msg.role === 'system')?.text || '';

@@ -7,7 +7,7 @@ const state = {
   personas: JSON.parse(localStorage.getItem('codex_personas') || '[]'),
   settings: {
     provider: localStorage.getItem('provider') || 'gemini',
-    geminiModel: localStorage.getItem('gemini_model') || 'gemini-2.0-flash',
+    geminiModel: localStorage.getItem('gemini_model') || 'gemini-3.1-pro-preview',
     openaiModel: localStorage.getItem('openai_model') || 'gpt-4.1-mini',
     geminiKey: localStorage.getItem('gemini_api_key') || '',
     openaiKey: localStorage.getItem('openai_api_key') || '',
@@ -91,7 +91,7 @@ function renderHistory() {
   chatArea.innerHTML = '';
   const session = getActiveSession();
   if (!session || session.messages.length === 0) {
-    addBubble('こんにちは。知恵の鏡へようこそ。', 'ai', null, false);
+    addBubble('ようこそ、白い写本へ。', 'ai', null, false);
     return;
   }
   session.messages.forEach((item, index) => addBubble(item.text, item.role, index));
