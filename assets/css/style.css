@@ -14,13 +14,29 @@ body { font-family: 'Noto Serif JP', serif; }
     background-blend-mode: multiply;
 }
 
-/* メッセージの装飾はブランシュの好みに合わせて調整してね */
+/* AIメッセージの調整 */
 .ai-msg {
     background: white;
-    border-radius: 1.5rem 1.5rem 1.5rem 0.2rem;
-    padding: 1rem;
-    max-width: 85%;
+    border: 1px solid #e2e8f0;
     color: #1e293b;
+}
+
+.dark .ai-msg {
+    /* 背景を少しだけ明るい紺にして、文字とのコントラストを上げます */
+    background: #1e293b; 
+    border: 1px solid #475569;
+    color: #f1f5f9;
+}
+
+/* ユーザーメッセージの調整 */
+.user-msg {
+    background: #334155;
+    color: #f8fafc;
+}
+
+.dark .user-msg {
+    background: #f1f5f9;
+    color: #0f172a;
 }
 
 .dark .ai-msg {
