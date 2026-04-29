@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   systemPrompt: 'system_prompt',
   temperature: 'temperature',
   maxTokens: 'max_tokens',
+  userSignature: 'user_signature',
 };
 
 function readJSON(key, fallback) {
@@ -37,6 +38,7 @@ const state = {
     geminiKey: localStorage.getItem(STORAGE_KEYS.geminiKey) || '',
     openaiKey: localStorage.getItem(STORAGE_KEYS.openaiKey) || '',
     systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '',
+    userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || 'Blanche',
     temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7),
     maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048),
   },
@@ -158,6 +160,9 @@ function addBubble(text, role, index = null, editable = true) {
   wrap.className = 'space-y-1';
   const div = document.createElement('div');
   div.className = role === 'user' ? 'user-msg' : 'ai-msg';
+  if (role === 'user') {
+    div.dataset.signature = `${state.settings.userSignature || 'Blanche'}:`;
+  }
   div.contentEditable = editable;
   div.innerText = text;
   div.onblur = () => {
@@ -312,6 +317,7 @@ function saveSettings() {
   localStorage.setItem(STORAGE_KEYS.geminiKey, state.settings.geminiKey);
   localStorage.setItem(STORAGE_KEYS.openaiKey, state.settings.openaiKey);
   localStorage.setItem(STORAGE_KEYS.systemPrompt, state.settings.systemPrompt);
+  localStorage.setItem(STORAGE_KEYS.userSignature, state.settings.userSignature);
   localStorage.setItem(STORAGE_KEYS.temperature, state.settings.temperature);
   localStorage.setItem(STORAGE_KEYS.maxTokens, state.settings.maxTokens);
 }
@@ -322,6 +328,7 @@ function applySettingsToUI() {
     geminiKey,
     openaiKey,
     systemPrompt,
+    userSignature,
     temperature,
     maxTokens,
     temperatureValue,
@@ -333,6 +340,7 @@ function applySettingsToUI() {
   geminiKey.value = state.settings.geminiKey;
   openaiKey.value = state.settings.openaiKey;
   systemPrompt.value = state.settings.systemPrompt;
+  userSignature.value = state.settings.userSignature;
   temperature.value = state.settings.temperature;
   temperatureValue.innerText = state.settings.temperature;
   maxTokens.value = state.settings.maxTokens;
@@ -340,7 +348,7 @@ function applySettingsToUI() {
 }
 
 function bindSettings() {
-  const { provider, model, geminiKey, openaiKey, systemPrompt, temperature, maxTokens, clearSystemPromptBtn, systemPresetToggle, temperatureValue, maxTokensValue } = dom;
+  const { provider, model, geminiKey, openaiKey, systemPrompt, userSignature, temperature, maxTokens, clearSystemPromptBtn, systemPresetToggle, temperatureValue, maxTokensValue } = dom;
 
   provider.onchange = () => {
     state.settings.provider = provider.value;
@@ -359,6 +367,12 @@ function bindSettings() {
   geminiKey.onchange = () => { state.settings.geminiKey = geminiKey.value.trim(); saveSettings(); };
   openaiKey.onchange = () => { state.settings.openaiKey = openaiKey.value.trim(); saveSettings(); };
   systemPrompt.onchange = () => { state.settings.systemPrompt = systemPrompt.value; saveSettings(); };
+  userSignature.onchange = () => {
+    state.settings.userSignature = userSignature.value.trim() || 'Blanche';
+    userSignature.value = state.settings.userSignature;
+    saveSettings();
+    renderHistory();
+  };
   temperature.oninput = () => {
     state.settings.temperature = Number(temperature.value);
     temperatureValue.innerText = temperature.value;
@@ -497,6 +511,7 @@ window.addEventListener('DOMContentLoaded', () => {
   dom.geminiKey = document.getElementById('gemini-key');
   dom.openaiKey = document.getElementById('openai-key');
   dom.systemPrompt = document.getElementById('system-prompt');
+  dom.userSignature = document.getElementById('user-signature');
   dom.temperature = document.getElementById('temperature');
   dom.maxTokens = document.getElementById('max-tokens');
   dom.temperatureValue = document.getElementById('temperature-value');
