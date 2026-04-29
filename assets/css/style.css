@@ -118,6 +118,12 @@ body { font-family: 'Noto Serif JP', serif; }
     background: #334155;
 }
 
+
+.preset-toggle-btn {
+    position: relative;
+    z-index: 60;
+}
+
 .system-preset-panel {
     position: fixed;
     left: 0;
@@ -132,6 +138,7 @@ body { font-family: 'Noto Serif JP', serif; }
     box-shadow: 0 12px 28px rgba(64, 38, 15, 0.2);
     transform: translateX(-105%);
     transition: transform 0.28s ease;
+    padding-top: 3.25rem;
 }
 
 .dark .system-preset-panel {
