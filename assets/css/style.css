@@ -2,6 +2,10 @@
 
 body { font-family: 'Noto Serif JP', serif; }
 
+.app-shell {
+    min-height: 100dvh;
+}
+
 .chat-bg {
     background-image: url('https://www.transparenttextures.com/patterns/paper.png');
 }
@@ -15,6 +19,26 @@ body { font-family: 'Noto Serif JP', serif; }
     background-image: url('https://www.transparenttextures.com/patterns/paper.png');
     background-blend-mode: multiply; /* 下地のセピア色と画像を合成する */
     background-color: transparent !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+#user-input {
+    max-height: 35dvh;
+}
+
+@media (max-width: 768px) {
+    body {
+        overscroll-behavior-y: contain;
+    }
+
+    .app-shell {
+        max-width: 100%;
+        box-shadow: none;
+    }
+
+    #chat-area {
+        padding-top: 1rem;
+    }
 }
 
 /* ユーザーの発言：力強い筆跡 */

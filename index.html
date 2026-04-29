@@ -17,7 +17,7 @@
     </script>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
-    <div class="flex flex-col h-[100dvh] max-w-md mx-auto shadow-2xl bg-[#f4f1ea] dark:bg-slate-800 transition-colors duration-300 overflow-hidden">
+    <div class="app-shell flex flex-col h-[100dvh] max-w-md mx-auto shadow-2xl bg-[#f4f1ea] dark:bg-slate-800 transition-colors duration-300 overflow-hidden">
         <header class="pt-[env(safe-area-inset-top)] px-4 pb-4 border-b dark:border-slate-700 flex justify-between items-center bg-[#f4f1ea]/90 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-10">
             <h1 class="text-xl font-serif font-bold tracking-widest text-slate-700 dark:text-slate-200">CODEX BLANCHE</h1>
             <button onclick="toggleSettings()" class="p-2 text-2xl grayscale dark:invert opacity-70">⚙️</button>
@@ -26,15 +26,10 @@
         <main id="chat-area" class="flex-grow overflow-y-auto p-4 space-y-4 chat-bg scroll-smooth bg-transparent">
             <div class="ai-msg shadow-sm border border-slate-100 dark:border-slate-700">こんにちは。知恵の鏡へようこそ。</div>
         </main>
-    
-    </div>
-
-
-
-        <footer class="p-4 border-t dark:border-slate-700 bg-white dark:bg-slate-800 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+        <footer class="p-4 border-t dark:border-slate-700 bg-white dark:bg-slate-800 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
             <div class="grid grid-cols-10 gap-3 items-center">
                 <div class="col-span-8">
-                    <textarea id="user-input" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-2xl px-4 py-2 focus:outline-none resize-none" placeholder="問いを深く刻む..." rows="1"></textarea>
+                    <textarea id="user-input" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-2xl px-4 py-2 focus:outline-none resize-none" placeholder="問いを深く刻む..." rows="1" enterkeyhint="send"></textarea>
                 </div>
                 <div class="col-span-2 flex justify-center">
                     <button onclick="handleSend()" class="bg-slate-800 dark:bg-slate-100 dark:text-slate-800 text-white w-12 h-12 rounded-full shadow-lg active:scale-90 transition-all flex items-center justify-center text-xl">🖋️</button>
