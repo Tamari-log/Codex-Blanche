@@ -1,23 +1,6 @@
 const chatArea = document.getElementById('chat-area');
 const userInput = document.getElementById('user-input');
 
-const ui = {
-  provider: document.getElementById('provider'),
-  model: document.getElementById('model'),
-  geminiKey: document.getElementById('gemini-key'),
-  openaiKey: document.getElementById('openai-key'),
-  systemPrompt: document.getElementById('system-prompt'),
-  temperature: document.getElementById('temperature'),
-  temperatureValue: document.getElementById('temperature-value'),
-  maxTokens: document.getElementById('max-tokens'),
-  maxTokensValue: document.getElementById('max-tokens-value'),
-  personaName: document.getElementById('persona-name'),
-  systemPersonaTabs: document.getElementById('system-persona-tabs'),
-  clearSystemPromptBtn: document.getElementById('clear-system-prompt-btn'),
-  systemPresetToggle: document.getElementById('system-preset-toggle'),
-  systemPresetPanel: document.getElementById('system-preset-panel'),
-};
-
 const state = {
   sessions: JSON.parse(localStorage.getItem('codex_sessions') || '[]'),
   activeSessionId: localStorage.getItem('codex_active_session_id'),
@@ -84,21 +67,22 @@ const MODEL_OPTIONS = {
 };
 
 function renderModelOptions() {
-  if (!ui.model) return;
+  const model = document.getElementById('model');
+  if (!model) return;
   const provider = state.settings.provider;
   const options = MODEL_OPTIONS[provider] || [];
   const selected = provider === 'gemini' ? state.settings.geminiModel : state.settings.openaiModel;
-  ui.model.innerHTML = '';
+  model.innerHTML = '';
   options.forEach((opt) => {
     const option = document.createElement('option');
     option.value = opt.value;
     option.textContent = opt.label;
-    ui.model.appendChild(option);
+    model.appendChild(option);
   });
   if (options.some((opt) => opt.value === selected)) {
-    ui.model.value = selected;
+    model.value = selected;
   } else if (options[0]) {
-    ui.model.value = options[0].value;
+    model.value = options[0].value;
     if (provider === 'gemini') state.settings.geminiModel = options[0].value;
     if (provider === 'openai') state.settings.openaiModel = options[0].value;
     saveSettings();
@@ -106,8 +90,9 @@ function renderModelOptions() {
 }
 
 function syncContextSliderLimit() {
+  const maxTokens = document.getElementById('max-tokens');
   const limit = CONTEXT_LIMITS[state.settings.provider] || 8192;
-  ui.maxTokens.max = String(limit);
+  maxTokens.max = String(limit);
   if (state.settings.maxTokens > limit) {
     state.settings.maxTokens = limit;
     saveSettings();
@@ -185,6 +170,10 @@ function addBubble(text, role, index = null, editable = true) {
 }
 
 function renderPersonaTabs() {
+  const customWrap = document.getElementById('persona-tabs');
+  const systemWrap = document.getElementById('system-persona-tabs');
+  customWrap.innerHTML = '';
+  systemWrap.innerHTML = '';
 
   const systemPersonas = SYSTEM_PERSONAS
     .filter((p) => !state.hiddenSystemPersonaIds.includes(p.id))
@@ -211,7 +200,11 @@ function renderPersonaTabs() {
 
     group.appendChild(btn);
     group.appendChild(del);
-
+    if (p.isSystem) {
+      systemWrap.appendChild(group);
+    } else {
+      customWrap.appendChild(group);
+    }
   });
 }
 
@@ -225,12 +218,12 @@ function applyPersona(persona) {
 }
 
 function savePersona() {
-  const name = ui.personaName.value.trim();
+  const name = document.getElementById('persona-name').value.trim();
   if (!name) return;
   state.personas.push({ name, settings: { ...state.settings } });
   persist();
   renderPersonaTabs();
-  ui.personaName.value = '';
+  document.getElementById('persona-name').value = '';
 }
 
 
@@ -299,53 +292,76 @@ function saveSettings() {
 
 function applySettingsToUI() {
   syncContextSliderLimit();
-  ui.provider.value = state.settings.provider;
+  document.getElementById('provider').value = state.settings.provider;
   renderModelOptions();
-  ui.geminiKey.value = state.settings.geminiKey;
-  ui.openaiKey.value = state.settings.openaiKey;
-  ui.systemPrompt.value = state.settings.systemPrompt;
-  ui.temperature.value = state.settings.temperature;
-  ui.temperatureValue.innerText = state.settings.temperature;
-  ui.maxTokens.value = state.settings.maxTokens;
-  ui.maxTokensValue.innerText = `${state.settings.maxTokens} / ${ui.maxTokens.max}`;
+  document.getElementById('gemini-key').value = state.settings.geminiKey;
+  document.getElementById('openai-key').value = state.settings.openaiKey;
+  document.getElementById('system-prompt').value = state.settings.systemPrompt;
+  document.getElementById('temperature').value = state.settings.temperature;
+  document.getElementById('temperature-value').innerText = state.settings.temperature;
+  document.getElementById('max-tokens').value = state.settings.maxTokens;
+  document.getElementById('max-tokens-value').innerText = `${state.settings.maxTokens} / ${document.getElementById('max-tokens').max}`;
 }
 
 function bindSettings() {
+  const provider = document.getElementById('provider');
+  const model = document.getElementById('model');
+  const geminiKey = document.getElementById('gemini-key');
+  const openaiKey = document.getElementById('openai-key');
+  const systemPrompt = document.getElementById('system-prompt');
+  const temperature = document.getElementById('temperature');
+  const maxTokens = document.getElementById('max-tokens');
+  const clearSystemPromptBtn = document.getElementById('clear-system-prompt-btn');
+  const systemPresetToggle = document.getElementById('system-preset-toggle');
 
+  provider.onchange = () => {
+    state.settings.provider = provider.value;
     syncContextSliderLimit();
     applySettingsToUI();
     saveSettings();
   };
-  ui.model.onchange = () => {
+  model.onchange = () => {
     if (state.settings.provider === 'gemini') {
-      state.settings.geminiModel = ui.model.value;
+      state.settings.geminiModel = model.value;
     } else {
-      state.settings.openaiModel = ui.model.value;
+      state.settings.openaiModel = model.value;
     }
     saveSettings();
   };
-  ui.geminiKey.onchange = () => { state.settings.geminiKey = ui.geminiKey.value.trim(); saveSettings(); };
-  ui.openaiKey.onchange = () => { state.settings.openaiKey = ui.openaiKey.value.trim(); saveSettings(); };
-  ui.systemPrompt.onchange = () => { state.settings.systemPrompt = ui.systemPrompt.value; saveSettings(); };
-  ui.temperature.oninput = () => {
-    state.settings.temperature = Number(ui.temperature.value);
-    ui.temperatureValue.innerText = ui.temperature.value;
+  geminiKey.onchange = () => { state.settings.geminiKey = geminiKey.value.trim(); saveSettings(); };
+  openaiKey.onchange = () => { state.settings.openaiKey = openaiKey.value.trim(); saveSettings(); };
+  systemPrompt.onchange = () => { state.settings.systemPrompt = systemPrompt.value; saveSettings(); };
+  temperature.oninput = () => {
+    state.settings.temperature = Number(temperature.value);
+    document.getElementById('temperature-value').innerText = temperature.value;
     saveSettings();
   };
-  ui.maxTokens.oninput = () => {
-    state.settings.maxTokens = Number(ui.maxTokens.value);
-    ui.maxTokensValue.innerText = `${ui.maxTokens.value} / ${ui.maxTokens.max}`;
+  maxTokens.oninput = () => {
+    state.settings.maxTokens = Number(maxTokens.value);
+    document.getElementById('max-tokens-value').innerText = `${maxTokens.value} / ${maxTokens.max}`;
     saveSettings();
   };
 
+  clearSystemPromptBtn.onclick = () => {
+    state.settings.systemPrompt = '';
+    systemPrompt.value = '';
+    saveSettings();
+  };
 
+  systemPresetToggle.onclick = () => {
     state.ui.showSystemPresetPanel = !state.ui.showSystemPresetPanel;
     renderSystemPresetPanel();
   };
 }
 
 function renderSystemPresetPanel() {
-
+  const panel = document.getElementById('system-preset-panel');
+  const toggle = document.getElementById('system-preset-toggle');
+  panel.classList.toggle('hidden', !state.ui.showSystemPresetPanel);
+  toggle.classList.toggle('is-open', state.ui.showSystemPresetPanel);
+  toggle.setAttribute('aria-expanded', state.ui.showSystemPresetPanel ? 'true' : 'false');
+  toggle.innerText = state.ui.showSystemPresetPanel ? 'システムプリセット ▼' : 'システムプリセット ▶';
+}
 
 async function handleSend() {
   const text = userInput.value.trim();
