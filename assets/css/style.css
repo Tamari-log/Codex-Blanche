@@ -83,7 +83,7 @@ body { font-family: 'Noto Serif JP', serif; }
     padding: 0.12rem 0.52rem;
 }
 
-.user-msg::before { content: "Blanche:"; }
+.user-msg::before { content: attr(data-signature); }
 .ai-msg::before { content: "Codex:"; }
 
 .dark .user-msg::before,
