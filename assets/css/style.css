@@ -50,3 +50,24 @@ body { font-family: 'Noto Serif JP', serif; }
     line-height: 1.5;
     transition: height 0.1s ease;
 }
+
+/* 編集中の吹き出しを強調 */
+[contenteditable="true"]:focus {
+    outline: 2px solid #94a3b8;
+    background-color: rgba(255, 255, 255, 0.9);
+    cursor: text;
+}
+
+.dark [contenteditable="true"]:focus {
+    background-color: rgba(30, 41, 59, 0.9);
+}
+
+/* 吹き出しのクリック感を出す */
+.ai-msg, .user-msg {
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.ai-msg:active, .user-msg:active {
+    transform: scale(0.99);
+}
