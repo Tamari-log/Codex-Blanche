@@ -12,521 +12,131 @@ const STORAGE_KEYS = {
   openaiModel: 'openai_model',
   geminiKey: 'gemini_api_key',
   openaiKey: 'openai_api_key',
+  googleClientId: 'google_client_id',
   systemPrompt: 'system_prompt',
   temperature: 'temperature',
   maxTokens: 'max_tokens',
   userSignature: 'user_signature',
 };
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FOLDER_NAME = 'CodexBlanche';
+const DRIVE_FILE_NAME = 'codex_data.json';
 
 function readJSON(key, fallback) {
-  try {
-    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
-  } catch {
-    return fallback;
-  }
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 }
 
-const state = {
-  sessions: readJSON(STORAGE_KEYS.sessions, []),
-  activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId),
-  personas: readJSON(STORAGE_KEYS.personas, []),
-  hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []),
-  settings: {
-    provider: localStorage.getItem(STORAGE_KEYS.provider) || 'gemini',
-    geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || 'gemini-3.1-pro-preview',
-    openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || 'gpt-4.1-mini',
-    geminiKey: localStorage.getItem(STORAGE_KEYS.geminiKey) || '',
-    openaiKey: localStorage.getItem(STORAGE_KEYS.openaiKey) || '',
-    systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '',
-    userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || 'Blanche',
-    temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7),
-    maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048),
+const state = { sessions: readJSON(STORAGE_KEYS.sessions, []), activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId), personas: readJSON(STORAGE_KEYS.personas, []), hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []), settings: { provider: localStorage.getItem(STORAGE_KEYS.provider) || 'gemini', geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || 'gemini-3.1-pro-preview', openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || 'gpt-4.1-mini', geminiKey: localStorage.getItem(STORAGE_KEYS.geminiKey) || '', openaiKey: localStorage.getItem(STORAGE_KEYS.openaiKey) || '', googleClientId: localStorage.getItem(STORAGE_KEYS.googleClientId) || '', systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '', userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || 'Blanche', temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7), maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048) }, ui: { showSystemPresetPanel: false, activePersonaId: null } };
+const CONTEXT_LIMITS = { gemini: 150000, openai: 50000 };
+const SYSTEM_PERSONAS = [{ id: 'sys-neutral', name: '標準', settings: { systemPrompt: '' } }, { id: 'sys-creative', name: '創作補助', settings: { temperature: 1.0, systemPrompt: 'あなたは創作支援に強いアシスタントです。複数案を提示し、改善点を具体的に示してください。' } }, { id: 'sys-concise', name: '簡潔回答', settings: { temperature: 0.3, systemPrompt: '要点を短く、箇条書き中心で回答してください。' } }];
+const MODEL_OPTIONS = { gemini: [{ value: 'gemini-3-flash-preview', label: 'gemini 3 flash（高速）' }, { value: 'gemini-3.1-flash-lite-preview', label: 'gemini 3.1 flash lite（新しい高速）' }, { value: 'gemini-3.1-pro-preview', label: 'gemini 3.1 pro（高性能）' }], openai: [{ value: 'gpt-4.1-mini', label: 'gpt-4.1-mini（高速）' }, { value: 'gpt-4.1', label: 'gpt-4.1（高性能）' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini（軽量）' }] };
+
+const driveSync = {
+  tokenClient: null, accessToken: null, folderId: null, fileId: null,
+  setStatus(text) { if (dom.driveStatus) dom.driveStatus.textContent = text; },
+  async init() {
+    if (!window.google?.accounts?.oauth2 || !window.gapi) return;
+    await new Promise((resolve) => gapi.load('client', resolve));
+    await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+    this.setStatus('Drive: Client準備完了（未接続）');
   },
-  ui: {
-    showSystemPresetPanel: false,
-    activePersonaId: null,
-  },
-};
-
-const CONTEXT_LIMITS = {
-  gemini: 150000,
-  openai: 50000,
-};
-
-
-
-const SYSTEM_PERSONAS = [
-  {
-    id: 'sys-neutral',
-    name: '標準',
-    settings: { systemPrompt: '' },
-  },
-  {
-    id: 'sys-creative',
-    name: '創作補助',
-    settings: {
-      temperature: 1.0,
-      systemPrompt: 'あなたは創作支援に強いアシスタントです。複数案を提示し、改善点を具体的に示してください。',
-    },
-  },
-  {
-    id: 'sys-concise',
-    name: '簡潔回答',
-    settings: {
-      temperature: 0.3,
-      systemPrompt: '要点を短く、箇条書き中心で回答してください。',
-    },
-  },
-];
-
-const MODEL_OPTIONS = {
-  gemini: [
-    { value: 'gemini-3-flash-preview', label: 'gemini 3 flash（高速）' },
-    { value: 'gemini-3.1-flash-lite-preview', label: 'gemini 3.1 flash lite（新しい高速）' },
-    { value: 'gemini-3.1-pro-preview', label: 'gemini 3.1 pro（高性能）' },
-  ],
-  openai: [
-    { value: 'gpt-4.1-mini', label: 'gpt-4.1-mini（高速）' },
-    { value: 'gpt-4.1', label: 'gpt-4.1（高性能）' },
-    { value: 'gpt-4o-mini', label: 'gpt-4o-mini（軽量）' },
-  ],
-};
-
-function renderModelOptions() {
-  const model = document.getElementById('model');
-  if (!model) return;
-  const provider = state.settings.provider;
-  const options = MODEL_OPTIONS[provider] || [];
-  const selected = provider === 'gemini' ? state.settings.geminiModel : state.settings.openaiModel;
-  model.innerHTML = '';
-  options.forEach((opt) => {
-    const option = document.createElement('option');
-    option.value = opt.value;
-    option.textContent = opt.label;
-    model.appendChild(option);
-  });
-  if (options.some((opt) => opt.value === selected)) {
-    model.value = selected;
-  } else if (options[0]) {
-    model.value = options[0].value;
-    if (provider === 'gemini') state.settings.geminiModel = options[0].value;
-    if (provider === 'openai') state.settings.openaiModel = options[0].value;
-    saveSettings();
-  }
-}
-
-function syncContextSliderLimit() {
-  const maxTokens = document.getElementById('max-tokens');
-  const limit = CONTEXT_LIMITS[state.settings.provider] || 8192;
-  maxTokens.max = String(limit);
-  if (state.settings.maxTokens > limit) {
-    state.settings.maxTokens = limit;
-    saveSettings();
-  }
-}
-
-function getActiveSession() {
-  return state.sessions.find((s) => s.id === state.activeSessionId);
-}
-
-function persist() {
-  localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions));
-  localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas));
-  localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || '');
-  localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds));
-}
-
-function startNewSession() {
-  const id = crypto.randomUUID();
-  state.sessions.unshift({ id, title: `会話 ${new Date().toLocaleString('ja-JP')}`, messages: [] });
-  state.activeSessionId = id;
-  persist();
-  renderHistory();
-  renderSessionList();
-}
-
-function renderHistory() {
-  chatArea.innerHTML = '';
-  const session = getActiveSession();
-  if (!session || session.messages.length === 0) {
-    addBubble('ようこそ、白い写本へ。', 'ai', null, false);
-    return;
-  }
-  session.messages.forEach((item, index) => addBubble(item.text, item.role, index));
-}
-
-function addBubble(text, role, index = null, editable = true) {
-  const wrap = document.createElement('div');
-  wrap.className = 'space-y-1';
-  const div = document.createElement('div');
-  div.className = role === 'user' ? 'user-msg' : 'ai-msg';
-  if (role === 'user') {
-    div.dataset.signature = `${state.settings.userSignature || 'Blanche'}:`;
-  }
-  div.contentEditable = editable;
-  div.innerText = text;
-  div.onblur = () => {
-    const session = getActiveSession();
-    if (index !== null && session?.messages[index]) {
-      session.messages[index].text = div.innerText;
-      persist();
+  ensureTokenClient() {
+    if (!state.settings.googleClientId) throw new Error('Google Client ID を設定してください');
+    if (!window.google?.accounts?.oauth2) throw new Error('Google Identity Services が未読み込みです');
+    if (!this.tokenClient) {
+      this.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: state.settings.googleClientId,
+        scope: DRIVE_SCOPE,
+        callback: (response) => {
+          if (response.error) throw new Error(response.error);
+          this.accessToken = response.access_token;
+          gapi.client.setToken({ access_token: response.access_token });
+          this.setStatus('Drive: 接続済み');
+        },
+      });
     }
-  };
-  wrap.appendChild(div);
-
-  if (index !== null) {
-    const controls = document.createElement('div');
-    controls.className = 'flex justify-end gap-2 text-xs';
-    const del = document.createElement('button');
-    del.className = 'px-2 py-1 rounded bg-slate-700 text-white';
-    del.innerText = '削除';
-    del.onclick = () => deleteMessage(index);
-    controls.appendChild(del);
-
-    if (role === 'ai') {
-      const retry = document.createElement('button');
-      retry.className = 'px-2 py-1 rounded bg-indigo-600 text-white';
-      retry.innerText = 'やり直し';
-      retry.onclick = () => regenerateAt(index);
-      controls.appendChild(retry);
-    }
-    wrap.appendChild(controls);
-  }
-
-  chatArea.appendChild(wrap);
-  chatArea.scrollTop = chatArea.scrollHeight;
-  return { wrap, div };
-}
-
-function renderPersonaTabs() {
-  const systemWrap = document.getElementById('system-persona-tabs');
-  systemWrap.innerHTML = '';
-
-  const systemPersonas = SYSTEM_PERSONAS
-    .filter((p) => !state.hiddenSystemPersonaIds.includes(p.id))
-    .map((p) => ({ ...p, isSystem: true }));
-  const customPersonas = state.personas.map((p, idx) => ({ ...p, customIndex: idx, isSystem: false, id: `custom-${idx}` }));
-
-  const allPersonas = [...systemPersonas, ...customPersonas];
-
-  allPersonas.forEach((p) => {
-    const btn = document.createElement('button');
-    const group = document.createElement('div');
-    group.className = 'persona-row';
-
-    btn.className = 'persona-tab-btn';
-    if (state.ui.activePersonaId === p.id) btn.classList.add('active');
-    btn.innerText = p.name;
-    btn.onclick = () => applyPersona(p);
-
-    const del = document.createElement('button');
-    del.className = 'persona-delete-btn';
-    del.innerText = '×';
-    del.title = `${p.name} を削除`;
-    del.onclick = () => deletePersona(p);
-
-    group.appendChild(btn);
-    group.appendChild(del);
-    systemWrap.appendChild(group);
-  });
-}
-
-function applyPersona(persona) {
-  if (!persona) return;
-  state.settings = { ...state.settings, ...persona.settings };
-  state.ui.activePersonaId = persona.id;
-  applySettingsToUI();
-  saveSettings();
-  renderPersonaTabs();
-  const tabButton = document.querySelector('.persona-tab-btn.active');
-  if (tabButton) {
-    tabButton.animate([
-      { transform: 'scale(1)', filter: 'brightness(1)' },
-      { transform: 'scale(1.06)', filter: 'brightness(1.2)' },
-      { transform: 'scale(1)', filter: 'brightness(1)' },
-    ], { duration: 220, easing: 'ease-out' });
-  }
-}
-
-function savePersona() {
-  const name = document.getElementById('persona-name').value.trim();
-  if (!name) return;
-  state.personas.push({ name, settings: { ...state.settings } });
-  persist();
-  renderPersonaTabs();
-  document.getElementById('persona-name').value = '';
-}
-
-
-function deletePersona(persona) {
-  if (!persona) return;
-  const ok = window.confirm(`プリセット「${persona.name}」を削除しますか？`);
-  if (!ok) return;
-
-  if (persona.isSystem) {
-    state.hiddenSystemPersonaIds.push(persona.id);
-  } else if (typeof persona.customIndex === 'number') {
-    state.personas.splice(persona.customIndex, 1);
-  }
-
-  persist();
-  renderPersonaTabs();
-}
-
-function formatAssistantError(error) {
-  const message = (error && error.message) ? error.message : String(error || '不明なエラー');
-  const lowered = message.toLowerCase();
-  const safetyPatterns = [
-    'safety',
-    'blocked',
-    'prohibited',
-    'policy',
-    'harmful',
-    'responsibleai',
-    'does not comply',
-    'content filter',
-  ];
-  const isSafetyRefusal = safetyPatterns.some((pattern) => lowered.includes(pattern));
-  if (isSafetyRefusal) {
-    return `【SAFETY_REFUSAL】AI安全機構により出力が拒否されました: ${message}`;
-  }
-  return `エラー：${message}`;
-}
-
-function renderSessionList() {
-  const list = document.getElementById('session-list');
-  list.innerHTML = '';
-  state.sessions.forEach((s) => {
-    const btn = document.createElement('button');
-    btn.className = 'w-full text-left p-2 rounded border dark:text-white';
-    btn.innerText = s.title;
-    btn.onclick = () => {
-      state.activeSessionId = s.id;
-      persist();
-      renderHistory();
-      toggleHistoryPanel();
-    };
-    list.appendChild(btn);
-  });
-}
-
-function saveSettings() {
-  localStorage.setItem(STORAGE_KEYS.provider, state.settings.provider);
-  localStorage.setItem(STORAGE_KEYS.geminiModel, state.settings.geminiModel);
-  localStorage.setItem(STORAGE_KEYS.openaiModel, state.settings.openaiModel);
-  localStorage.setItem(STORAGE_KEYS.geminiKey, state.settings.geminiKey);
-  localStorage.setItem(STORAGE_KEYS.openaiKey, state.settings.openaiKey);
-  localStorage.setItem(STORAGE_KEYS.systemPrompt, state.settings.systemPrompt);
-  localStorage.setItem(STORAGE_KEYS.userSignature, state.settings.userSignature);
-  localStorage.setItem(STORAGE_KEYS.temperature, state.settings.temperature);
-  localStorage.setItem(STORAGE_KEYS.maxTokens, state.settings.maxTokens);
-}
-
-function applySettingsToUI() {
-  const {
-    provider,
-    geminiKey,
-    openaiKey,
-    systemPrompt,
-    userSignature,
-    temperature,
-    maxTokens,
-    temperatureValue,
-    maxTokensValue,
-  } = dom;
-  syncContextSliderLimit();
-  provider.value = state.settings.provider;
-  renderModelOptions();
-  geminiKey.value = state.settings.geminiKey;
-  openaiKey.value = state.settings.openaiKey;
-  systemPrompt.value = state.settings.systemPrompt;
-  userSignature.value = state.settings.userSignature;
-  temperature.value = state.settings.temperature;
-  temperatureValue.innerText = state.settings.temperature;
-  maxTokens.value = state.settings.maxTokens;
-  maxTokensValue.innerText = `${state.settings.maxTokens} / ${maxTokens.max}`;
-}
-
-function bindSettings() {
-  const { provider, model, geminiKey, openaiKey, systemPrompt, userSignature, temperature, maxTokens, clearSystemPromptBtn, systemPresetToggle, temperatureValue, maxTokensValue } = dom;
-
-  provider.onchange = () => {
-    state.settings.provider = provider.value;
-    syncContextSliderLimit();
-    applySettingsToUI();
-    saveSettings();
-  };
-  model.onchange = () => {
-    if (state.settings.provider === 'gemini') {
-      state.settings.geminiModel = model.value;
-    } else {
-      state.settings.openaiModel = model.value;
-    }
-    saveSettings();
-  };
-  geminiKey.onchange = () => { state.settings.geminiKey = geminiKey.value.trim(); saveSettings(); };
-  openaiKey.onchange = () => { state.settings.openaiKey = openaiKey.value.trim(); saveSettings(); };
-  systemPrompt.onchange = () => { state.settings.systemPrompt = systemPrompt.value; saveSettings(); };
-  userSignature.onchange = () => {
-    state.settings.userSignature = userSignature.value.trim() || 'Blanche';
-    userSignature.value = state.settings.userSignature;
-    saveSettings();
-    renderHistory();
-  };
-  temperature.oninput = () => {
-    state.settings.temperature = Number(temperature.value);
-    temperatureValue.innerText = temperature.value;
-    saveSettings();
-  };
-  maxTokens.oninput = () => {
-    state.settings.maxTokens = Number(maxTokens.value);
-    maxTokensValue.innerText = `${maxTokens.value} / ${maxTokens.max}`;
-    saveSettings();
-  };
-
-  clearSystemPromptBtn.onclick = () => {
-    state.settings.systemPrompt = '';
-    systemPrompt.value = '';
-    saveSettings();
-  };
-
-  systemPresetToggle.onclick = () => {
-    state.ui.showSystemPresetPanel = !state.ui.showSystemPresetPanel;
-    renderSystemPresetPanel();
-  };
-}
-
-function renderSystemPresetPanel() {
-  const panel = document.getElementById('system-preset-panel');
-  const toggle = document.getElementById('system-preset-toggle');
-  panel.classList.toggle('is-open', state.ui.showSystemPresetPanel);
-  toggle.classList.toggle('is-open', state.ui.showSystemPresetPanel);
-  toggle.setAttribute('aria-expanded', state.ui.showSystemPresetPanel ? 'true' : 'false');
-}
-
-async function handleSend() {
-  const text = userInput.value.trim();
-  if (!text) return;
-  const session = getActiveSession();
-  if (!session) return;
-
-  const apiKey = state.settings.provider === 'gemini' ? state.settings.geminiKey : state.settings.openaiKey;
-  if (!apiKey) return;
-
-  userInput.disabled = true;
-  session.messages.push({ role: 'user', text });
-  persist();
-  renderHistory();
-  userInput.value = '';
-
-  const loading = addBubble('思索中...', 'ai');
-  try {
-    const messages = [...session.messages];
-    const reply = await generateAssistantReply(messages, apiKey);
-    session.messages.push({ role: 'ai', text: reply });
-    persist();
-    renderHistory();
-  } catch (e) {
-    loading.div.innerText = formatAssistantError(e);
-  } finally {
-    userInput.disabled = false;
-    userInput.focus();
-  }
-}
-
-async function generateAssistantReply(messages, apiKey) {
-  return state.settings.provider === 'gemini'
-    ? callGeminiAPI(messages, apiKey, {
-      model: state.settings.geminiModel,
-      temperature: state.settings.temperature,
-      maxTokens: state.settings.maxTokens,
-      systemInstruction: state.settings.systemPrompt,
-    })
-    : callOpenAIAPI([
-      ...(state.settings.systemPrompt ? [{ role: 'system', text: state.settings.systemPrompt }] : []),
-      ...messages,
-    ], apiKey, {
-      model: state.settings.openaiModel,
-      temperature: state.settings.temperature,
-      maxTokens: state.settings.maxTokens,
+  },
+  async signIn(interactive = true) {
+    this.ensureTokenClient();
+    await new Promise((resolve, reject) => {
+      const prev = this.tokenClient.callback;
+      this.tokenClient.callback = (resp) => {
+        if (resp.error) { reject(new Error(resp.error)); return; }
+        this.accessToken = resp.access_token;
+        gapi.client.setToken({ access_token: resp.access_token });
+        this.setStatus('Drive: 接続済み');
+        this.tokenClient.callback = prev;
+        resolve();
+      };
+      this.tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
     });
-}
+  },
+  signOut() { this.accessToken = null; gapi.client.setToken(null); this.setStatus('Drive: 未接続'); },
+  async ensureReady() { if (!this.accessToken) await this.signIn(false); await this.ensureFolderAndFile(); },
+  async ensureFolderAndFile() {
+    const folderQ = `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const folder = await gapi.client.drive.files.list({ q: folderQ, fields: 'files(id,name)' });
+    this.folderId = folder.result.files?.[0]?.id;
+    if (!this.folderId) {
+      const created = await gapi.client.drive.files.create({ resource: { name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }, fields: 'id' });
+      this.folderId = created.result.id;
+    }
+    const fileQ = `name='${DRIVE_FILE_NAME}' and '${this.folderId}' in parents and trashed=false`;
+    const fileList = await gapi.client.drive.files.list({ q: fileQ, fields: 'files(id,name,modifiedTime)' });
+    this.fileId = fileList.result.files?.[0]?.id || null;
+  },
+  payload() { return { sessions: state.sessions, personas: state.personas }; },
+  async push() {
+    await this.ensureReady();
+    const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [this.folderId] };
+    const boundary = 'foo_bar_baz';
+    const body = JSON.stringify(this.payload());
+    const multipartBody = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+    await gapi.client.request({ path: this.fileId ? `/upload/drive/v3/files/${this.fileId}` : '/upload/drive/v3/files', method: this.fileId ? 'PATCH' : 'POST', params: { uploadType: 'multipart' }, headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body: multipartBody });
+    if (!this.fileId) await this.ensureFolderAndFile();
+    this.setStatus(`Drive: 同期済み ${new Date().toLocaleTimeString('ja-JP')}`);
+  },
+  async pull() {
+    await this.ensureReady();
+    if (!this.fileId) return;
+    const r = await gapi.client.drive.files.get({ fileId: this.fileId, alt: 'media' });
+    if (r.result?.sessions) state.sessions = r.result.sessions;
+    if (r.result?.personas) state.personas = r.result.personas;
+    if (!state.sessions.length) startNewSession();
+    if (!state.activeSessionId || !state.sessions.find((s) => s.id === state.activeSessionId)) state.activeSessionId = state.sessions[0]?.id || null;
+    await persistState({ syncDrive: false });
+    renderHistory(); renderSessionList(); renderPersonaTabs();
+    this.setStatus(`Drive: 取得済み ${new Date().toLocaleTimeString('ja-JP')}`);
+  },
+};
 
-function deleteMessage(index) {
-  const session = getActiveSession();
-  if (!session?.messages[index]) return;
-  session.messages.splice(index, 1);
-  persist();
-  renderHistory();
-}
+async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); if (syncDrive && driveSync.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
 
-async function regenerateAt(index) {
-  const session = getActiveSession();
-  if (!session?.messages[index] || session.messages[index].role !== 'ai') return;
-  const apiKey = state.settings.provider === 'gemini' ? state.settings.geminiKey : state.settings.openaiKey;
-  if (!apiKey) return;
-  const contextMessages = session.messages.slice(0, index);
-  session.messages = contextMessages;
-  persist();
-  renderHistory();
-  const loading = addBubble('思索中...', 'ai');
-  try {
-    const reply = await generateAssistantReply(contextMessages, apiKey);
-    session.messages.push({ role: 'ai', text: reply });
-    persist();
-    renderHistory();
-  } catch (e) {
-    loading.div.innerText = formatAssistantError(e);
-  }
-}
-
-function deleteActiveSession() {
-  const session = getActiveSession();
-  if (!session) return;
-  state.sessions = state.sessions.filter((s) => s.id !== session.id);
-  if (state.sessions.length === 0) {
-    startNewSession();
-    return;
-  }
-  state.activeSessionId = state.sessions[0].id;
-  persist();
-  renderHistory();
-  renderSessionList();
-}
-
-function toggleSettings() { document.getElementById('settings-modal').classList.toggle('hidden'); }
-function toggleHistoryPanel() { document.getElementById('history-panel').classList.toggle('hidden'); }
-function updateModeButton() {
-  const { modeToggleBtn: btn } = dom;
-  btn.innerHTML = document.documentElement.classList.contains('dark') ? '☀️ ライトモードへ' : '🌙 ダークモードへ';
-}
-function toggleDarkMode() { document.documentElement.classList.toggle('dark'); localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'; updateModeButton(); }
-
-userInput.addEventListener('input', function () { this.style.height = 'auto'; this.style.height = `${this.scrollHeight}px`; });
-userInput.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } });
-
-window.addEventListener('DOMContentLoaded', () => {
-  dom.provider = document.getElementById('provider');
-  dom.model = document.getElementById('model');
-  dom.geminiKey = document.getElementById('gemini-key');
-  dom.openaiKey = document.getElementById('openai-key');
-  dom.systemPrompt = document.getElementById('system-prompt');
-  dom.userSignature = document.getElementById('user-signature');
-  dom.temperature = document.getElementById('temperature');
-  dom.maxTokens = document.getElementById('max-tokens');
-  dom.temperatureValue = document.getElementById('temperature-value');
-  dom.maxTokensValue = document.getElementById('max-tokens-value');
-  dom.clearSystemPromptBtn = document.getElementById('clear-system-prompt-btn');
-  dom.systemPresetToggle = document.getElementById('system-preset-toggle');
-  dom.modeToggleBtn = document.getElementById('mode-toggle-btn');
-
-  if (!state.sessions.length) startNewSession();
-  if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id;
-  updateModeButton();
-  applySettingsToUI();
-  bindSettings();
-  renderHistory();
-  renderSessionList();
-  renderPersonaTabs();
-  renderSystemPresetPanel();
-});
+// below mostly original
+function renderModelOptions(){const model=document.getElementById('model');if(!model)return;const provider=state.settings.provider;const options=MODEL_OPTIONS[provider]||[];const selected=provider==='gemini'?state.settings.geminiModel:state.settings.openaiModel;model.innerHTML='';options.forEach((opt)=>{const option=document.createElement('option');option.value=opt.value;option.textContent=opt.label;model.appendChild(option);});if(options.some((opt)=>opt.value===selected)){model.value=selected;}else if(options[0]){model.value=options[0].value;if(provider==='gemini')state.settings.geminiModel=options[0].value;if(provider==='openai')state.settings.openaiModel=options[0].value;saveSettings();}}
+function syncContextSliderLimit(){const maxTokens=document.getElementById('max-tokens');const limit=CONTEXT_LIMITS[state.settings.provider]||8192;maxTokens.max=String(limit);if(state.settings.maxTokens>limit){state.settings.maxTokens=limit;saveSettings();}}
+const getActiveSession=()=>state.sessions.find((s)=>s.id===state.activeSessionId);
+async function startNewSession(){const id=crypto.randomUUID();state.sessions.unshift({id,title:`会話 ${new Date().toLocaleString('ja-JP')}`,messages:[]});state.activeSessionId=id;await persistState();renderHistory();renderSessionList();}
+function renderHistory(){chatArea.innerHTML='';const session=getActiveSession();if(!session||session.messages.length===0){addBubble('ようこそ、白い写本へ。','ai',null,false);return;}session.messages.forEach((item,index)=>addBubble(item.text,item.role,index));}
+function addBubble(text,role,index=null,editable=true){const wrap=document.createElement('div');wrap.className='space-y-1';const div=document.createElement('div');div.className=role==='user'?'user-msg':'ai-msg';if(role==='user')div.dataset.signature=`${state.settings.userSignature||'Blanche'}:`;div.contentEditable=editable;div.innerText=text;div.onblur=()=>{const session=getActiveSession();if(index!==null&&session?.messages[index]){session.messages[index].text=div.innerText;persistState();}};wrap.appendChild(div);if(index!==null){const controls=document.createElement('div');controls.className='flex justify-end gap-2 text-xs';const del=document.createElement('button');del.className='px-2 py-1 rounded bg-slate-700 text-white';del.innerText='削除';del.onclick=()=>deleteMessage(index);controls.appendChild(del);if(role==='ai'){const retry=document.createElement('button');retry.className='px-2 py-1 rounded bg-indigo-600 text-white';retry.innerText='やり直し';retry.onclick=()=>regenerateAt(index);controls.appendChild(retry);}wrap.appendChild(controls);}chatArea.appendChild(wrap);chatArea.scrollTop=chatArea.scrollHeight;return {wrap,div};}
+function renderPersonaTabs(){const w=document.getElementById('system-persona-tabs');w.innerHTML='';[...SYSTEM_PERSONAS.filter((p)=>!state.hiddenSystemPersonaIds.includes(p.id)).map((p)=>({...p,isSystem:true})),...state.personas.map((p,idx)=>({...p,customIndex:idx,isSystem:false,id:`custom-${idx}`}))].forEach((p)=>{const btn=document.createElement('button');const g=document.createElement('div');g.className='persona-row';btn.className='persona-tab-btn';if(state.ui.activePersonaId===p.id)btn.classList.add('active');btn.innerText=p.name;btn.onclick=()=>applyPersona(p);const del=document.createElement('button');del.className='persona-delete-btn';del.innerText='×';del.onclick=()=>deletePersona(p);g.appendChild(btn);g.appendChild(del);w.appendChild(g);});}
+function applyPersona(persona){if(!persona)return;state.settings={...state.settings,...persona.settings};state.ui.activePersonaId=persona.id;applySettingsToUI();saveSettings();renderPersonaTabs();}
+async function savePersona(){const name=document.getElementById('persona-name').value.trim();if(!name)return;state.personas.push({name,settings:{...state.settings}});await persistState();renderPersonaTabs();document.getElementById('persona-name').value='';}
+async function deletePersona(persona){if(!persona||!window.confirm(`プリセット「${persona.name}」を削除しますか？`))return;if(persona.isSystem)state.hiddenSystemPersonaIds.push(persona.id);else if(typeof persona.customIndex==='number')state.personas.splice(persona.customIndex,1);await persistState();renderPersonaTabs();}
+function renderSessionList(){const list=document.getElementById('session-list');list.innerHTML='';state.sessions.forEach((s)=>{const btn=document.createElement('button');btn.className='w-full text-left p-2 rounded border dark:text-white';btn.innerText=s.title;btn.onclick=()=>{state.activeSessionId=s.id;persistState();renderHistory();toggleHistoryPanel();};list.appendChild(btn);});}
+function saveSettings(){Object.entries({[STORAGE_KEYS.provider]:state.settings.provider,[STORAGE_KEYS.geminiModel]:state.settings.geminiModel,[STORAGE_KEYS.openaiModel]:state.settings.openaiModel,[STORAGE_KEYS.geminiKey]:state.settings.geminiKey,[STORAGE_KEYS.openaiKey]:state.settings.openaiKey,[STORAGE_KEYS.googleClientId]:state.settings.googleClientId,[STORAGE_KEYS.systemPrompt]:state.settings.systemPrompt,[STORAGE_KEYS.userSignature]:state.settings.userSignature,[STORAGE_KEYS.temperature]:state.settings.temperature,[STORAGE_KEYS.maxTokens]:state.settings.maxTokens}).forEach(([k,v])=>localStorage.setItem(k,v));}
+function applySettingsToUI(){syncContextSliderLimit();dom.provider.value=state.settings.provider;renderModelOptions();dom.geminiKey.value=state.settings.geminiKey;dom.openaiKey.value=state.settings.openaiKey;dom.googleClientId.value=state.settings.googleClientId;dom.systemPrompt.value=state.settings.systemPrompt;dom.userSignature.value=state.settings.userSignature;dom.temperature.value=state.settings.temperature;dom.temperatureValue.innerText=state.settings.temperature;dom.maxTokens.value=state.settings.maxTokens;dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}
+function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${e.message}`);}};googleLogoutBtn.onclick=()=>driveSync.signOut();}
+function renderSystemPresetPanel(){const p=document.getElementById('system-preset-panel');const t=document.getElementById('system-preset-toggle');p.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.setAttribute('aria-expanded',state.ui.showSystemPresetPanel?'true':'false');}
+async function handleSend(){const text=userInput.value.trim();if(!text)return;const s=getActiveSession();if(!s)return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;userInput.disabled=true;s.messages.push({role:'user',text});await persistState();renderHistory();userInput.value='';const loading=addBubble('思索中...','ai');try{const reply=await generateAssistantReply([...s.messages],apiKey);s.messages.push({role:'ai',text:reply});await persistState();renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;}finally{userInput.disabled=false;userInput.focus();}}
+async function generateAssistantReply(messages, apiKey) { return state.settings.provider === 'gemini' ? callGeminiAPI(messages, apiKey, { model: state.settings.geminiModel, temperature: state.settings.temperature, maxTokens: state.settings.maxTokens, systemInstruction: state.settings.systemPrompt }) : callOpenAIAPI([...(state.settings.systemPrompt ? [{ role: 'system', text: state.settings.systemPrompt }] : []), ...messages], apiKey, { model: state.settings.openaiModel, temperature: state.settings.temperature, maxTokens: state.settings.maxTokens }); }
+async function deleteMessage(index){const s=getActiveSession();if(!s?.messages[index])return;s.messages.splice(index,1);await persistState();renderHistory();}
+async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[index]||s.messages[index].role!=='ai')return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const context=s.messages.slice(0,index);s.messages=context;await persistState();renderHistory();const loading=addBubble('思索中...','ai');try{const reply=await generateAssistantReply(context,apiKey);s.messages.push({role:'ai',text:reply});await persistState();renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;}}
+async function deleteActiveSession(){const s=getActiveSession();if(!s)return;state.sessions=state.sessions.filter((x)=>x.id!==s.id);if(state.sessions.length===0){await startNewSession();return;}state.activeSessionId=state.sessions[0].id;await persistState();renderHistory();renderSessionList();}
+function toggleSettings(){document.getElementById('settings-modal').classList.toggle('hidden');} function toggleHistoryPanel(){document.getElementById('history-panel').classList.toggle('hidden');}
+function updateModeButton(){dom.modeToggleBtn.innerHTML=document.documentElement.classList.contains('dark')?'☀️ ライトモードへ':'🌙 ダークモードへ';}
+function toggleDarkMode(){document.documentElement.classList.toggle('dark');localStorage.theme=document.documentElement.classList.contains('dark')?'dark':'light';updateModeButton();}
+async function syncWithDrive(){try{await driveSync.pull();}catch(e){driveSync.setStatus(`同期失敗: ${e.message}`);}}
+window.syncWithDrive = syncWithDrive;
+userInput.addEventListener('input', function () { this.style.height = 'auto'; this.style.height = `${this.scrollHeight}px`; }); userInput.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } });
+window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
