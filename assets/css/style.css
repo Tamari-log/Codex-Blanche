@@ -15,59 +15,68 @@ body { font-family: 'Noto Serif JP', serif; }
 }
 
 /* AIメッセージの調整 */
-.ai-msg {
-    background: white;
-    border: 1px solid #e2e8f0;
-    color: #1e293b;
+/* 吹き出し（Bubble）の概念を消去し、テキスト行（Entry）にする */
+.ai-msg, .user-msg {
+    max-width: 100%; /* 横幅いっぱい使う */
+    padding: 0.8rem 0; /* 上下の余白のみ */
+    font-size: 1.05rem;
+    line-height: 1.8;
+    position: relative;
+    margin-bottom: 1.5rem;
 }
 
-.dark .ai-msg {
-    /* 背景を少しだけ明るい紺にして、文字とのコントラストを上げます */
-    background: #1e293b; 
-    border: 1px solid #475569;
-    color: #f1f5f9;
-}
-
-/* ユーザーメッセージの調整 */
+/* ユーザーの書き込み（右寄せせず、左側から「筆跡」を変える） */
 .user-msg {
-    background: #334155;
-    color: #f8fafc;
+    color: #1e293b;
+    font-weight: bold;
+    border-left: 3px solid #94a3b8 !important; /* 左側に細い縦線で「発言者」を区別 */
+    padding-left: 1rem;
 }
 
 .dark .user-msg {
-    background: #f1f5f9;
-    color: #0f172a;
+    color: #e2e8f0;
+    border-left: 3px solid #475569 !important;
+}
+
+/* AIの書き込み（より「記録」らしい落ち着いた色） */
+.ai-msg {
+    color: #334155;
+    padding-left: 1rem;
 }
 
 .dark .ai-msg {
-    background: #334155;
-    color: #f1f5f9;
+    color: #cbd5e1;
 }
 
-#user-input {
-    min-height: 44px; /* 指でタップしやすい最小サイズ */
-    max-height: 150px;
-    line-height: 1.5;
-    transition: height 0.1s ease;
+/* 「誰が書いたか」を小さな添え字で表現する（オプション） */
+.user-msg::before {
+    content: "Blanche:";
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.1rem;
+    text-transform: uppercase;
+    opacity: 0.5;
+    margin-bottom: 0.2rem;
 }
 
-/* 編集中の吹き出しを強調 */
+.ai-msg::before {
+    content: "Codex:";
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.1rem;
+    text-transform: uppercase;
+    opacity: 0.5;
+    margin-bottom: 0.2rem;
+}
+
+/* 編集中のスタイルも「紙に書き込んでいる」風に */
 [contenteditable="true"]:focus {
-    outline: 2px solid #94a3b8;
-    background-color: rgba(255, 255, 255, 0.9);
-    cursor: text;
+    outline: none;
+    background-color: rgba(0, 0, 0, 0.03); /* ほんの少しだけ紙の色が変わる */
+    border-left: 3px solid #3b82f6 !important;
 }
 
 .dark [contenteditable="true"]:focus {
     background-color: rgba(30, 41, 59, 0.9);
 }
 
-/* 吹き出しのクリック感を出す */
-.ai-msg, .user-msg {
-    cursor: pointer;
-    transition: transform 0.1s;
-}
-
-.ai-msg:active, .user-msg:active {
-    transform: scale(0.99);
-}
