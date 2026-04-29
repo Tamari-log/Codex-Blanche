@@ -151,8 +151,40 @@ const driveSync = {
 async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); if (syncDrive && driveSync.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
 
 // below mostly original
-function renderModelOptions(){const model=document.getElementById('model');if(!model)return;const provider=state.settings.provider;const options=MODEL_OPTIONS[provider]||[];const selected=provider==='gemini'?state.settings.geminiModel:state.settings.openaiModel;model.innerHTML='';options.forEach((opt)=>{const option=document.createElement('option');option.value=opt.value;option.textContent=opt.label;model.appendChild(option);});if(options.some((opt)=>opt.value===selected)){model.value=selected;}else if(options[0]){model.value=options[0].value;if(provider==='gemini')state.settings.geminiModel=options[0].value;if(provider==='openai')state.settings.openaiModel=options[0].value;saveSettings();}}
-function syncContextSliderLimit(){const maxTokens=document.getElementById('max-tokens');const limit=CONTEXT_LIMITS[state.settings.provider]||8192;maxTokens.max=String(limit);if(state.settings.maxTokens>limit){state.settings.maxTokens=limit;saveSettings();}}
+function renderModelOptions() {
+  const model = document.getElementById('model');
+  if (!model) return;
+
+  const provider = state.settings.provider;
+  const options = MODEL_OPTIONS[provider] || [];
+  const selected = provider === 'gemini' ? state.settings.geminiModel : state.settings.openaiModel;
+
+  model.innerHTML = '';
+  options.forEach((opt) => {
+    const option = document.createElement('option');
+    option.value = opt.value;
+    option.textContent = opt.label;
+    model.appendChild(option);
+  });
+
+  if (options.some((opt) => opt.value === selected)) {
+    model.value = selected;
+  } else if (options[0]) {
+    model.value = options[0].value;
+    if (provider === 'gemini') state.settings.geminiModel = options[0].value;
+    if (provider === 'openai') state.settings.openaiModel = options[0].value;
+    saveSettings();
+  }
+}
+function syncContextSliderLimit() {
+  const maxTokens = document.getElementById('max-tokens');
+  const limit = CONTEXT_LIMITS[state.settings.provider] || 8192;
+  maxTokens.max = String(limit);
+  if (state.settings.maxTokens > limit) {
+    state.settings.maxTokens = limit;
+    saveSettings();
+  }
+}
 const getActiveSession=()=>state.sessions.find((s)=>s.id===state.activeSessionId);
 async function startNewSession(){const id=crypto.randomUUID();state.sessions.unshift({id,title:`会話 ${new Date().toLocaleString('ja-JP')}`,messages:[]});state.activeSessionId=id;await persistState();renderHistory();renderSessionList();}
 function renderHistory(){chatArea.innerHTML='';const session=getActiveSession();if(!session||session.messages.length===0){addBubble('ようこそ、白い写本へ。','ai',null,false);return;}session.messages.forEach((item,index)=>addBubble(item.text,item.role,index));}
@@ -186,11 +218,27 @@ async function generateAssistantReply(messages, apiKey) { return state.settings.
 async function deleteMessage(index){const s=getActiveSession();if(!s?.messages[index])return;s.messages.splice(index,1);await persistState();renderHistory();}
 async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[index]||s.messages[index].role!=='ai')return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const context=s.messages.slice(0,index);s.messages=context;await persistState();renderHistory();const loading=addBubble('思索中...','ai');try{const reply=await generateAssistantReply(context,apiKey);s.messages.push({role:'ai',text:reply});await persistState();await revealWithQuillEffect(loading.div,reply);renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;}}
 async function deleteActiveSession(){const s=getActiveSession();if(!s)return;state.sessions=state.sessions.filter((x)=>x.id!==s.id);if(state.sessions.length===0){await startNewSession();return;}state.activeSessionId=state.sessions[0].id;await persistState();renderHistory();renderSessionList();}
-function toggleSettings(){document.getElementById('settings-modal').classList.toggle('hidden');} function toggleHistoryPanel(){document.getElementById('history-panel').classList.toggle('hidden');}
+function toggleSettings() {
+  document.getElementById('settings-modal').classList.toggle('hidden');
+}
+
+function toggleHistoryPanel() {
+  document.getElementById('history-panel').classList.toggle('hidden');
+}
 function updateModeButton(){dom.modeToggleBtn.innerHTML=document.documentElement.classList.contains('dark')?'☀️ ライトモードへ':'🌙 ダークモードへ';}
 function toggleDarkMode(){document.documentElement.classList.toggle('dark');localStorage.theme=document.documentElement.classList.contains('dark')?'dark':'light';updateModeButton();}
 async function syncWithDrive(){try{await driveSync.pull();}catch(e){driveSync.setStatus(`同期失敗: ${e.message}`);}}
 window.syncWithDrive = syncWithDrive;
 document.addEventListener('click',(event)=>{const btn=event.target.closest('.settings-action-btn');if(!btn)return;btn.classList.remove('is-pressed');requestAnimationFrame(()=>{btn.classList.add('is-pressed');setTimeout(()=>btn.classList.remove('is-pressed'),170);});});
-userInput.addEventListener('input', function () { this.style.height = 'auto'; this.style.height = `${this.scrollHeight}px`; }); userInput.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } });
+userInput.addEventListener('input', function () {
+  this.style.height = 'auto';
+  this.style.height = `${this.scrollHeight}px`;
+});
+
+userInput.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+});
 window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
