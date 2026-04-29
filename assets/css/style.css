@@ -202,6 +202,41 @@ body { font-family: 'Noto Serif JP', serif; }
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28);
 }
 
+
+.system-persona-tabs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.persona-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.persona-row .persona-tab-btn {
+    margin-inline: auto;
+}
+
+.persona-delete-btn {
+    margin-left: auto;
+    padding: 0.25rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    border: 1px solid #fda4af;
+    color: #e11d48;
+    background: transparent;
+}
+
+.dark .persona-delete-btn {
+    border-color: #fb7185;
+    color: #fecdd3;
+}
+
 @keyframes slideIn {
     from { opacity: 0; transform: translateX(-12px); }
     to { opacity: 1; transform: translateX(0); }
