@@ -207,7 +207,7 @@ function renderPersonaTabs() {
   allPersonas.forEach((p) => {
     const btn = document.createElement('button');
     const group = document.createElement('div');
-    group.className = 'flex items-center gap-1';
+    group.className = 'persona-row';
 
     btn.className = 'persona-tab-btn';
     if (state.ui.activePersonaId === p.id) btn.classList.add('active');
@@ -215,7 +215,7 @@ function renderPersonaTabs() {
     btn.onclick = () => applyPersona(p);
 
     const del = document.createElement('button');
-    del.className = 'px-2 py-1 rounded-full text-xs border border-rose-400 text-rose-600 dark:text-rose-300';
+    del.className = 'persona-delete-btn';
     del.innerText = '×';
     del.title = `${p.name} を削除`;
     del.onclick = () => deletePersona(p);
