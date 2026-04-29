@@ -1,16 +1,49 @@
-/* 中世のフォント感を演出 */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap');
 
 body {
     font-family: 'Noto Serif JP', serif;
 }
 
-/* メッセージのフェードイン */
-.ai-msg, .chat-bubble {
-    animation: fadeIn 0.3s ease-out;
+/* AIとユーザーの吹き出しをより美しく */
+.ai-msg, .user-msg {
+    max-width: 85%;
+    padding: 1rem;
+    border-radius: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    animation: slideUp 0.3s ease-out;
 }
 
-@keyframes fadeIn {
+.ai-msg {
+    background: white;
+    color: #1e293b;
+    border-bottom-left-radius: 0.2rem;
+    margin-right: auto;
+}
+
+.dark .ai-msg {
+    background: #334155;
+    color: #f1f5f9;
+}
+
+.user-msg {
+    background: #1e293b;
+    color: white;
+    border-bottom-right-radius: 0.2rem;
+    margin-left: auto;
+}
+
+.dark .user-msg {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+@keyframes slideUp {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* スクロールバーを隠す（iOSライクに） */
+#chat-area::-webkit-scrollbar {
+    display: none;
 }

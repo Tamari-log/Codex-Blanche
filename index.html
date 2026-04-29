@@ -4,34 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Codex Blanche</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="assets/css/style.css">
+    <script>
+        // ダークモードの初期判定
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    </script>
 </head>
-<body class="bg-slate-50 text-slate-900">
-    <div class="flex flex-col h-screen max-w-md mx-auto shadow-2xl bg-white">
-        <header class="p-4 border-b flex justify-between items-center bg-white sticky top-0 z-10">
-            <h1 class="text-xl font-serif font-bold tracking-widest text-slate-700">CODEX BLANCHE</h1>
-            <button onclick="toggleSettings()" class="text-2xl opacity-70 hover:opacity-100 transition-opacity">⚙️</button>
+<body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <div class="flex flex-col h-[100dvh] max-w-md mx-auto shadow-2xl bg-white dark:bg-slate-800 transition-colors duration-300 overflow-hidden">
+        
+        <header class="pt-[env(safe-area-inset-top)] px-4 pb-4 border-b dark:border-slate-700 flex justify-between items-center bg-white/80 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-10">
+            <h1 class="text-xl font-serif font-bold tracking-widest text-slate-700 dark:text-slate-200">CODEX BLANCHE</h1>
+            <button onclick="toggleSettings()" class="p-2 text-2xl grayscale dark:invert opacity-70">⚙️</button>
         </header>
 
-        <main id="chat-area" class="flex-grow overflow-y-auto p-4 space-y-4 bg-[url('https://www.transparenttextures.com/patterns/paper.png')]">
-            <div class="ai-msg">こんにちは、ブランシュ様。知恵の鏡へようこそ。</div>
+        <main id="chat-area" class="flex-grow overflow-y-auto p-4 space-y-4 bg-[url('https://www.transparenttextures.com/patterns/paper.png')] dark:bg-slate-900/50 scroll-smooth">
+            <div class="ai-msg shadow-sm border border-slate-100 dark:border-slate-700">こんにちは、ブランシュ様。知恵の鏡へようこそ。</div>
         </main>
 
-        <footer class="p-4 border-t bg-white pb-8">
-            <div class="flex gap-2">
-                <input type="text" id="user-input" class="flex-grow border border-slate-300 rounded-full px-5 py-2 focus:outline-none focus:border-slate-500" placeholder="問いを刻む...">
-                <button onclick="handleSend()" class="bg-slate-800 text-white w-12 h-12 rounded-full shadow-lg active:scale-95 transition-transform">🖋️</button>
+        <footer class="p-4 border-t dark:border-slate-700 bg-white dark:bg-slate-800 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+            <div class="flex gap-2 items-center">
+                <input type="text" id="user-input" class="flex-grow border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-full px-5 py-3 focus:outline-none focus:ring-2 focus:ring-slate-400" placeholder="問いを刻む...">
+                <button onclick="handleSend()" class="bg-slate-800 dark:bg-slate-200 dark:text-slate-800 text-white w-12 h-12 rounded-full shadow-lg active:scale-90 transition-all flex items-center justify-center text-xl">🖋️</button>
             </div>
         </footer>
 
-        <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-            <div class="bg-white rounded-3xl p-8 w-full shadow-2xl border border-slate-200">
-                <h2 class="text-2xl font-serif font-bold mb-6 text-slate-800">秘術の設定</h2>
-                <label class="block text-sm font-semibold text-slate-500 mb-2 uppercase tracking-tighter">Gemini API Key</label>
-                <input type="password" id="api-key" class="w-full border rounded-xl p-3 mb-6 bg-slate-50 focus:ring-2 focus:ring-slate-400 outline-none" placeholder="Keyをここへ...">
-                <button onclick="toggleSettings()" class="w-full bg-slate-800 text-white py-4 rounded-xl font-bold shadow-lg">書庫を閉じる</button>
+        <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-6">
+            <div class="bg-white dark:bg-slate-800 rounded-[2rem] p-8 w-full shadow-2xl border border-slate-200 dark:border-slate-700 transform transition-all scale-100">
+                <h2 class="text-2xl font-serif font-bold mb-6 text-slate-800 dark:text-white">写本の管理</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">Appearance</label>
+                        <button onclick="toggleDarkMode()" class="w-full flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-700 rounded-xl">
+                            <span class="dark:hidden font-medium">🌙 ダークモードへ</span>
+                            <span class="hidden dark:inline font-medium text-white">☀️ ライトモードへ</span>
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">Gemini API Key</label>
+                        <input type="password" id="api-key" class="w-full border dark:border-slate-600 rounded-xl p-3 bg-slate-50 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-slate-400 outline-none transition-all" placeholder="Keyをここへ...">
+                    </div>
+                </div>
+
+                <button onclick="toggleSettings()" class="w-full mt-8 bg-slate-800 dark:bg-white dark:text-slate-800 text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all">書庫に戻る</button>
             </div>
         </div>
     </div>
