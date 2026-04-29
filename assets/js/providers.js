@@ -25,7 +25,7 @@ function normalizeGeminiContents(messages) {
 
 async function callGeminiAPI(messages, apiKey, options = {}) {
   const model = options.model || 'gemini-3.1-pro-preview';
-  const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const systemMessage = options.systemInstruction
     || messages.find((msg) => msg.role === 'system')?.text
@@ -36,21 +36,22 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     throw new Error('Gemini向けの履歴が不正です（最初の発話はユーザーである必要があります）');
   }
 
-  const body = {
-    contents,
-    generationConfig: {
-      temperature: options.temperature,
-      maxOutputTokens: options.maxTokens,
-    },
-  };
+  const generationConfig = {};
+  if (typeof options.temperature === 'number') generationConfig.temperature = options.temperature;
+  if (typeof options.maxTokens === 'number') generationConfig.maxOutputTokens = options.maxTokens;
 
+  const body = { contents };
+  if (Object.keys(generationConfig).length) body.generationConfig = generationConfig;
   if (systemMessage) {
-    body.systemInstruction = { parts: [{ text: systemMessage }] };
+    body.system_instruction = { parts: [{ text: systemMessage }] };
   }
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
     body: JSON.stringify(body),
   });
 
