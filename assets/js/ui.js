@@ -25,7 +25,6 @@ async function revealWithQuillEffect(chatArea, el, text) {
   el.innerText = text || '';
   void el.offsetWidth;
   el.classList.add('reveal-fade-in');
-  chatArea.scrollTop = chatArea.scrollHeight;
 }
 
 window.appUi = { setThinkingMode, isMobileInputMode, addTransientDeleteButton, revealWithQuillEffect };
