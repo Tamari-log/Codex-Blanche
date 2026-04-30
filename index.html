@@ -71,29 +71,63 @@
             <div class="bg-white dark:bg-slate-800 rounded-[2rem] p-6 w-full shadow-2xl border border-slate-200 dark:border-slate-700 transform transition-all scale-100 max-h-[90dvh] overflow-y-auto">
                 <h2 class="text-2xl font-serif font-bold mb-6 text-slate-800 dark:text-white text-center">写本の管理</h2>
                 <div class="space-y-4">
-                    <button onclick="toggleDarkMode()" id="mode-toggle-btn" class="w-full p-3 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold dark:text-white settings-action-btn"></button>
-                    <select id="provider" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white">
-                        <option value="gemini">Gemini</option>
-                        <option value="openai">ChatGPT (OpenAI)</option>
-                    </select>
-                    <select id="model" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white"></select>
-                    <input type="password" id="gemini-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Gemini API Key">
-                    <input type="password" id="openai-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="OpenAI API Key">
-                    <input id="google-client-id" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Google Client ID">
-                    <div class="flex gap-2">
-                        <button id="google-login-btn" class="flex-1 bg-emerald-700 text-white py-2 rounded-lg settings-action-btn">Google接続</button>
-                        <button id="google-logout-btn" class="flex-1 bg-slate-500 text-white py-2 rounded-lg settings-action-btn">接続解除</button>
+                    <div class="settings-sections space-y-3">
+                        <button type="button" class="settings-section-toggle" data-target="account-link-section">アカウント / 連携</button>
+                        <div id="account-link-section" class="settings-section-panel hidden">
+                            <input id="google-client-id" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Google Client ID">
+                            <div class="flex gap-2 mt-2">
+                                <button id="google-login-btn" class="flex-1 bg-emerald-700 text-white py-2 rounded-lg settings-action-btn">Google接続</button>
+                                <button id="google-logout-btn" class="flex-1 bg-slate-500 text-white py-2 rounded-lg settings-action-btn">接続解除</button>
+                            </div>
+                        </div>
+
+                        <button type="button" class="settings-section-toggle" data-target="ai-settings-section">AI設定</button>
+                        <div id="ai-settings-section" class="settings-section-panel hidden space-y-3">
+                            <div class="settings-subsection">
+                                <p class="settings-subsection-title">モデル / APIキー</p>
+                                <select id="provider" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white">
+                                    <option value="gemini">Gemini</option>
+                                    <option value="openai">ChatGPT (OpenAI)</option>
+                                </select>
+                                <select id="model" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white mt-2"></select>
+                                <input type="password" id="gemini-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white mt-2" placeholder="Gemini API Key">
+                                <input type="password" id="openai-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white mt-2" placeholder="OpenAI API Key">
+                            </div>
+                            <div class="settings-subsection">
+                                <p class="settings-subsection-title">振る舞い（プロンプト・温度）</p>
+                                <div class="space-y-2">
+                                    <textarea id="system-prompt" rows="4" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="システムプロンプト"></textarea>
+                                    <button id="clear-system-prompt-btn" class="ml-auto block w-auto bg-slate-200 dark:bg-slate-700 dark:text-white px-3 py-1.5 text-sm rounded-lg settings-action-btn">システムプロンプトを空にする</button>
+                                </div>
+                                <label class="text-sm dark:text-white">温度 <span id="temperature-value"></span></label>
+                                <input id="temperature" type="range" min="0" max="2" step="0.1" class="w-full">
+                            </div>
+                            <div class="settings-subsection">
+                                <p class="settings-subsection-title">コンテキスト / 署名</p>
+                                <input id="user-signature" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="ユーザー署名（例: Blanche）">
+                                <label class="text-sm dark:text-white">コンテキスト長（トークン） <span id="max-tokens-value"></span></label>
+                                <input id="max-tokens" type="range" min="256" max="150000" step="256" class="w-full">
+                            </div>
+                        </div>
+
+                        <button type="button" class="settings-section-toggle" data-target="display-settings-section">表示設定</button>
+                        <div id="display-settings-section" class="settings-section-panel hidden">
+                            <button onclick="toggleDarkMode()" id="mode-toggle-btn" class="w-full p-3 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold dark:text-white settings-action-btn"></button>
+                        </div>
+
+                        <button type="button" class="settings-section-toggle" data-target="advanced-settings-section">詳細設定</button>
+                        <div id="advanced-settings-section" class="settings-section-panel hidden space-y-2">
+                            <button type="button" class="settings-section-toggle settings-sub-toggle" data-target="developer-settings-section">開発者向け</button>
+                            <div id="developer-settings-section" class="settings-section-panel hidden">
+                                <button type="button" class="settings-section-toggle settings-sub-toggle" data-target="log-settings-section">ログ</button>
+                                <div id="log-settings-section" class="settings-section-panel hidden">
+                                    <button onclick="toggleHistoryPanel()" class="w-full bg-slate-700 text-white rounded-lg py-2 settings-action-btn">ログ表示画面を開く</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     </div>
                     <p id="drive-status" class="text-xs text-slate-600 dark:text-slate-300">Drive: 未接続</p>
-                    <div class="space-y-2">
-                        <textarea id="system-prompt" rows="4" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="システムプロンプト"></textarea>
-                        <button id="clear-system-prompt-btn" class="ml-auto block w-auto bg-slate-200 dark:bg-slate-700 dark:text-white px-3 py-1.5 text-sm rounded-lg settings-action-btn">システムプロンプトを空にする</button>
-                    </div>
-                    <input id="user-signature" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="ユーザー署名（例: Blanche）">
-                    <label class="text-sm dark:text-white">温度 <span id="temperature-value"></span></label>
-                    <input id="temperature" type="range" min="0" max="2" step="0.1" class="w-full">
-                    <label class="text-sm dark:text-white">コンテキスト長（トークン） <span id="max-tokens-value"></span></label>
-                    <input id="max-tokens" type="range" min="256" max="150000" step="256" class="w-full">
                     <input id="persona-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="保存するプリセット名">
                     <button onclick="savePersona()" class="w-full bg-indigo-600 text-white py-2 rounded-lg settings-action-btn">プリセット保存</button>
                     <button onclick="startNewSession()" class="w-full bg-slate-600 text-white py-2 rounded-lg settings-action-btn">新規会話を開始</button>
