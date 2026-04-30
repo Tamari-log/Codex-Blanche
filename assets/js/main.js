@@ -97,193 +97,8 @@ function installConsoleLogHook() {
   });
 }
 
-const driveSync = {
-  tokenClient: null, accessToken: null, folderId: null, fileId: null,
-  _initPromise: null,
-  _opChain: Promise.resolve(),
-  enqueue(operation) {
-    const run = this._opChain.then(() => operation());
-    this._opChain = run.catch(() => {});
-    return run;
-  },
-  getDriveFolderName() { return (state.settings.driveFolderName || DEFAULT_DRIVE_FOLDER_NAME).trim(); },
-  getDriveFileName() {
-    const normalized = (state.settings.driveFileName || DEFAULT_DRIVE_FILE_NAME).trim();
-    return normalized.endsWith('.json') ? normalized : `${normalized}.json`;
-  },
-  setStatus(text) { if (dom.driveStatus) dom.driveStatus.textContent = text; },
-  async waitForGoogleLibs(timeoutMs = 10000) {
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < timeoutMs) {
-      if (window.gapi && window.google?.accounts?.oauth2) return;
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    throw new Error('Google API ライブラリの読み込みがタイムアウトしました');
-  },
-  async init() {
-    if (this._initPromise) return this._initPromise;
-    this._initPromise = (async () => {
-      await this.waitForGoogleLibs();
-      await new Promise((resolve, reject) => {
-        gapi.load('client', {
-          callback: resolve,
-          onerror: () => reject(new Error('gapi client のロードに失敗しました')),
-          timeout: 5000,
-          ontimeout: () => reject(new Error('gapi client のロードがタイムアウトしました')),
-        });
-      });
-      await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
-      if (!gapi.client.drive?.files) throw new Error('Drive API の初期化に失敗しました');
-      this.setStatus('Drive: Client準備完了（未接続）');
-    })();
-    return this._initPromise;
-  },
-  async ensureTokenClient() {
-    await this.init();
-    if (!state.settings.googleClientId) throw new Error('Google Client ID を設定してください');
-    if (!window.google?.accounts?.oauth2) throw new Error('Google Identity Services が未読み込みです');
-    if (!this.tokenClient) {
-      this.tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: state.settings.googleClientId,
-        scope: DRIVE_SCOPE,
-        callback: (response) => {
-          if (response?.error) throw new Error(getErrorMessage(response));
-          this.accessToken = response.access_token;
-          gapi.client.setToken({ access_token: response.access_token });
-          this.setStatus('Drive: 接続済み');
-        },
-      });
-    }
-  },
-  async signIn(interactive = true) {
-    await this.ensureTokenClient();
-    await new Promise((resolve, reject) => {
-      const prev = this.tokenClient.callback;
-      this.tokenClient.callback = (resp) => {
-        if (resp?.error) { reject(new Error(getErrorMessage(resp))); return; }
-        this.accessToken = resp.access_token;
-        gapi.client.setToken({ access_token: resp.access_token });
-        this.setStatus('Drive: 接続済み');
-        this.tokenClient.callback = prev;
-        resolve();
-      };
-      this.tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
-    });
-  },
-  async signOut() { await this.init(); this.accessToken = null; gapi.client.setToken(null); this.setStatus('Drive: 未接続'); },
-  async ensureReady() { await this.init(); if (!this.accessToken) await this.signIn(false); await this.ensureFolderAndFile(); },
-  async ensureFolderAndFile() {
-    const folderName = this.getDriveFolderName().replace(/'/g, "\\'");
-    const fileName = this.getDriveFileName().replace(/'/g, "\\'");
-    const folderQ = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-    const folder = await gapi.client.drive.files.list({ q: folderQ, fields: 'files(id,name)' });
-    this.folderId = folder.result.files?.[0]?.id;
-    if (!this.folderId) {
-      const created = await gapi.client.drive.files.create({ resource: { name: folderName, mimeType: 'application/vnd.google-apps.folder' }, fields: 'id' });
-      this.folderId = created.result.id;
-    }
-    const fileQ = `name='${fileName}' and '${this.folderId}' in parents and trashed=false`;
-    const fileList = await gapi.client.drive.files.list({ q: fileQ, fields: 'files(id,name,modifiedTime)' });
-    this.fileId = fileList.result.files?.[0]?.id || null;
-  },
-  payload() { return { sessions: state.sessions, personas: state.personas, deletedAt: this.getDeletedAt() || null }; },
-  getLocalUpdatedAt() { return Number(localStorage.getItem(STORAGE_KEYS.localUpdatedAt) || 0); },
-  setLocalUpdatedAt(timestamp = Date.now()) { localStorage.setItem(STORAGE_KEYS.localUpdatedAt, String(timestamp)); },
-  getLastRemoteModifiedAt() { return Date.parse(localStorage.getItem(STORAGE_KEYS.lastRemoteModifiedAt) || '') || 0; },
-  setLastRemoteModifiedAt(isoTime = '') { if (isoTime) localStorage.setItem(STORAGE_KEYS.lastRemoteModifiedAt, isoTime); },
-  getDeletedAt() { return Number(localStorage.getItem(STORAGE_KEYS.deletedAt) || 0); },
-  setDeletedAt(timestamp = 0) {
-    if (timestamp > 0) localStorage.setItem(STORAGE_KEYS.deletedAt, String(timestamp));
-    else localStorage.removeItem(STORAGE_KEYS.deletedAt);
-  },
-  shouldKeepTombstone(timestamp = this.getDeletedAt(), now = Date.now()) {
-    return timestamp > 0 && now - timestamp <= TOMBSTONE_RETENTION_MS;
-  },
-  hasSyncData() {
-    const hasPersonas = state.personas.length > 0 || state.hiddenSystemPersonaIds.length > 0;
-    const hasMessages = state.sessions.some((session) => (session.messages?.length || 0) > 0);
-    return hasPersonas || hasMessages;
-  },
-  async _deleteRemoteFileInternal() {
-    const deletedAt = Date.now();
-    this.setDeletedAt(deletedAt);
-    state.sessions = [];
-    state.personas = [];
-    await this._pushInternal();
-    this.setStatus(`Drive: 削除マーク同期済み ${new Date().toLocaleTimeString('ja-JP')}`);
-  },
-  async deleteRemoteFile() {
-    return this.enqueue(async () => {
-      await this.ensureReady();
-      await this._deleteRemoteFileInternal();
-    });
-  },
-  async _pushInternal() {
-    const hasData = this.hasSyncData();
-    if (hasData) this.setDeletedAt(0);
-    const deletedAt = this.getDeletedAt();
-    if (!hasData && !this.shouldKeepTombstone(deletedAt)) {
-      this.setDeletedAt(Date.now());
-    }
-    const meta = this.fileId
-      ? { name: this.getDriveFileName(), mimeType: 'application/json' }
-      : { name: this.getDriveFileName(), mimeType: 'application/json', parents: [this.folderId] };
-    const boundary = 'foo_bar_baz';
-    const body = JSON.stringify(this.payload());
-    const multipartBody = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-    await gapi.client.request({ path: this.fileId ? `/upload/drive/v3/files/${this.fileId}` : '/upload/drive/v3/files', method: this.fileId ? 'PATCH' : 'POST', params: { uploadType: 'multipart' }, headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body: multipartBody });
-    if (!this.fileId) await this.ensureFolderAndFile();
-    const fileMeta = this.fileId ? await gapi.client.drive.files.get({ fileId: this.fileId, fields: 'modifiedTime' }) : null;
-    if (fileMeta?.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
-    this.setStatus(`Drive: 同期済み ${new Date().toLocaleTimeString('ja-JP')}`);
-  },
-  async push() {
-    return this.enqueue(async () => {
-      await this.ensureReady();
-      await this._pushInternal();
-    });
-  },
-  async pull() {
-    return this.enqueue(async () => {
-      await this.ensureReady();
-      if (!this.fileId) return;
-      const fileMeta = await gapi.client.drive.files.get({ fileId: this.fileId, fields: 'modifiedTime' });
-      const remoteModifiedAt = Date.parse(fileMeta.result?.modifiedTime || '') || 0;
-      const localUpdatedAt = this.getLocalUpdatedAt();
-      const lastRemoteModifiedAt = this.getLastRemoteModifiedAt();
-      const hasUnsyncedLocalChanges = this.hasSyncData() && localUpdatedAt > lastRemoteModifiedAt;
-      if (hasUnsyncedLocalChanges && localUpdatedAt - remoteModifiedAt > CONFLICT_TIME_BUFFER_MS) {
-        await this._pushInternal();
-        this.setStatus(`Drive: ローカルを優先して上書き同期 ${new Date().toLocaleTimeString('ja-JP')}`);
-        return;
-      }
-      const r = await gapi.client.drive.files.get({ fileId: this.fileId, alt: 'media' });
-      const remoteDeletedAt = Number(r.result?.deletedAt || 0);
-      if (remoteDeletedAt > 0 && this.shouldKeepTombstone(remoteDeletedAt)) {
-        if (localUpdatedAt <= remoteDeletedAt) {
-          this.setDeletedAt(remoteDeletedAt);
-          state.sessions = [];
-          state.personas = [];
-          if (!state.sessions.length) await startNewSession();
-          await persistState({ syncDrive: false });
-          if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
-          renderHistory(); renderSessionList(); renderPersonaTabs();
-          this.setStatus(`Drive: 削除マークを適用 ${new Date().toLocaleTimeString('ja-JP')}`);
-          return;
-        }
-      }
-      if (Array.isArray(r.result?.sessions)) state.sessions = r.result.sessions;
-      if (Array.isArray(r.result?.personas)) state.personas = r.result.personas;
-      this.setDeletedAt(0);
-      if (!state.sessions.length) await startNewSession();
-      if (!state.activeSessionId || !state.sessions.find((s) => s.id === state.activeSessionId)) state.activeSessionId = state.sessions[0]?.id || null;
-      await persistState({ syncDrive: false });
-      if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
-      renderHistory(); renderSessionList(); renderPersonaTabs();
-      this.setStatus(`Drive: 取得済み ${new Date().toLocaleTimeString('ja-JP')}`);
-    });
-  },
-};
+let driveSync = null;
+
 
 async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); driveSync.setLocalUpdatedAt(); if (syncDrive && driveSync.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
 
@@ -339,25 +154,13 @@ function saveSettings(){Object.entries({[STORAGE_KEYS.provider]:state.settings.p
 function applySettingsToUI(){syncContextSliderLimit();dom.provider.value=state.settings.provider;renderModelOptions();dom.geminiKey.value=state.settings.geminiKey;dom.openaiKey.value=state.settings.openaiKey;dom.googleClientId.value=state.settings.googleClientId;dom.driveFolderName.value=state.settings.driveFolderName;dom.driveFileName.value=state.settings.driveFileName;dom.systemPrompt.value=state.settings.systemPrompt;dom.userSignature.value=state.settings.userSignature;dom.temperature.value=state.settings.temperature;dom.temperatureValue.innerText=state.settings.temperature;dom.maxTokens.value=state.settings.maxTokens;dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}
 function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,driveFolderName,driveFileName,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};driveFolderName.onchange=()=>{state.settings.driveFolderName=driveFolderName.value.trim()||DEFAULT_DRIVE_FOLDER_NAME;driveSync.folderId=null;driveSync.fileId=null;saveSettings();};driveFileName.onchange=()=>{state.settings.driveFileName=driveFileName.value.trim()||DEFAULT_DRIVE_FILE_NAME;driveSync.fileId=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${getErrorMessage(e)}`);}};googleLogoutBtn.onclick=async()=>{try{await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${getErrorMessage(e)}`);}};}
 
-async function revealWithQuillEffect(el,text){
-  el.classList.remove('reveal-fade-in');
-  el.innerText=text||'';
-  void el.offsetWidth;
-  el.classList.add('reveal-fade-in');
-  chatArea.scrollTop=chatArea.scrollHeight;
-}
-
 function closeSystemPresetPanel(){state.ui.showSystemPresetPanel=false;renderSystemPresetPanel();}
 function renderSystemPresetPanel(){const p=document.getElementById('system-preset-panel');const t=document.getElementById('system-preset-toggle');const b=document.getElementById('system-preset-backdrop');p.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.classList.toggle('is-open',state.ui.showSystemPresetPanel);b?.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.setAttribute('aria-expanded',state.ui.showSystemPresetPanel?'true':'false');}
 let currentRequestController = null;
 
-function setThinkingMode(isThinking){if(!dom.sendBtn)return;dom.sendBtn.innerText=isThinking?SEND_BUTTON_STOP_ICON:SEND_BUTTON_DEFAULT_ICON;dom.sendBtn.setAttribute('aria-label',isThinking?'生成を中断':'送信');}
-function isMobileInputMode(){return window.matchMedia(MOBILE_MEDIA_QUERY).matches;}
-function addTransientDeleteButton(targetWrap){if(!targetWrap)return;const controls=document.createElement('div');controls.className='flex justify-end gap-2 text-xs';const del=document.createElement('button');del.className='px-2 py-1 rounded bg-slate-700 text-white';del.innerText='削除';del.onclick=()=>targetWrap.remove();controls.appendChild(del);targetWrap.appendChild(controls);}
-async function handleSend(){if(currentRequestController){currentRequestController.abort();return;}const text=userInput.value.trim();if(!text)return;const s=getActiveSession();if(!s)return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const controller=new AbortController();currentRequestController=controller;setThinkingMode(true);s.messages.push({role:'user',text});await persistState();renderHistory();userInput.value='';userInput.dispatchEvent(new Event('input'));const loading=addBubble('思索中...','ai');try{const reply=await generateAssistantReply([...s.messages],apiKey,controller.signal);s.messages.push({role:'ai',text:reply});await persistState();await revealWithQuillEffect(loading.div,reply);renderHistory();}catch(e){if(e?.name==='AbortError'){loading.div.innerText='生成を中断しました。';}else{loading.div.innerText=`エラー：${e.message||e}`;}addTransientDeleteButton(loading.wrap);}finally{currentRequestController=null;setThinkingMode(false);userInput.focus();}}
-async function generateAssistantReply(messages, apiKey, signal) { return state.settings.provider === 'gemini' ? callGeminiAPI(messages, apiKey, { model: state.settings.geminiModel, temperature: state.settings.temperature, maxTokens: state.settings.maxTokens, systemInstruction: state.settings.systemPrompt, signal }) : callOpenAIAPI([...(state.settings.systemPrompt ? [{ role: 'system', text: state.settings.systemPrompt }] : []), ...messages], apiKey, { model: state.settings.openaiModel, temperature: state.settings.temperature, maxTokens: state.settings.maxTokens, signal }); }
+async function handleSend(){if(currentRequestController){currentRequestController.abort();return;}const text=userInput.value.trim();if(!text)return;const s=getActiveSession();if(!s)return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const controller=new AbortController();currentRequestController=controller;appUi.setThinkingMode(dom.sendBtn, true, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });s.messages.push({role:'user',text});await persistState();renderHistory();userInput.value='';userInput.dispatchEvent(new Event('input'));const loading=addBubble('思索中...','ai');try{const reply=await appApi.generateAssistantReply({ provider: state.settings.provider, messages: [...s.messages], apiKey, settings: state.settings, signal: controller.signal });s.messages.push({role:'ai',text:reply});await persistState();await appUi.revealWithQuillEffect(chatArea, loading.div, reply);renderHistory();}catch(e){if(e?.name==='AbortError'){loading.div.innerText='生成を中断しました。';}else{loading.div.innerText=`エラー：${e.message||e}`;}appUi.addTransientDeleteButton(loading.wrap);}finally{currentRequestController=null;appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });userInput.focus();}}
 async function deleteMessage(index){const s=getActiveSession();if(!s?.messages[index])return;s.messages.splice(index,1);await persistState();renderHistory();}
-async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[index]||s.messages[index].role!=='ai')return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const context=s.messages.slice(0,index);s.messages=context;await persistState();renderHistory();const loading=addBubble('思索中...','ai');try{const reply=await generateAssistantReply(context,apiKey);s.messages.push({role:'ai',text:reply});await persistState();await revealWithQuillEffect(loading.div,reply);renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;addTransientDeleteButton(loading.wrap);}}
+async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[index]||s.messages[index].role!=='ai')return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const context=s.messages.slice(0,index);s.messages=context;await persistState();renderHistory();const loading=addBubble('思索中...','ai');try{const reply=await appApi.generateAssistantReply({ provider: state.settings.provider, messages: context, apiKey, settings: state.settings });s.messages.push({role:'ai',text:reply});await persistState();await appUi.revealWithQuillEffect(chatArea, loading.div, reply);renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;appUi.addTransientDeleteButton(loading.wrap);}}
 async function deleteSessionById(sessionId){const target=state.sessions.find((x)=>x.id===sessionId);if(!target)return;const confirmed=window.confirm(`会話「${target.title}」を削除しますか？\nこの操作は取り消せません。`);if(!confirmed)return;state.sessions=state.sessions.filter((x)=>x.id!==target.id);if(state.sessions.length===0){await startNewSession();return;}if(state.activeSessionId===target.id)state.activeSessionId=state.sessions[0].id;await persistState();renderHistory();renderSessionList();}
 async function deleteActiveSession(){const s=getActiveSession();if(!s)return;await deleteSessionById(s.id);}
 async function renameSessionById(sessionId){const session=state.sessions.find((x)=>x.id===sessionId);if(!session)return;const nextName=window.prompt('会話名を入力してください',session.title);if(nextName===null)return;const normalized=nextName.trim();if(!normalized)return;session.title=normalized;await persistState();renderSessionList();}
@@ -416,9 +219,10 @@ userInput.addEventListener('input', function () {
 });
 
 userInput.addEventListener('keydown', function (e) {
-  if (!isMobileInputMode() && e.key === 'Enter' && !e.shiftKey) {
+  if (!appUi.isMobileInputMode(MOBILE_MEDIA_QUERY) && e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     handleSend();
   }
 });
-window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','settings-back-btn','dev-log-list'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook(); setThinkingMode(false); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); bindSettingsNavigation(); renderSettingsView(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); renderDevLogs(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
+window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','settings-back-btn','dev-log-list'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
+  driveSync = appSync.createDriveSync({ state, dom, STORAGE_KEYS, DEFAULT_DRIVE_FOLDER_NAME, DEFAULT_DRIVE_FILE_NAME, DRIVE_SCOPE, TOMBSTONE_RETENTION_MS, CONFLICT_TIME_BUFFER_MS, getErrorMessage, startNewSession, persistState, renderHistory, renderSessionList, renderPersonaTabs }); appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON }); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); bindSettingsNavigation(); renderSettingsView(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); renderDevLogs(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
