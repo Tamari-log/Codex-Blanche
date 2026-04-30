@@ -155,7 +155,9 @@ const driveSync = {
       await this._deleteRemoteFileInternal();
       return;
     }
-    const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [this.folderId] };
+    const meta = this.fileId
+      ? { name: DRIVE_FILE_NAME, mimeType: 'application/json' }
+      : { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [this.folderId] };
     const boundary = 'foo_bar_baz';
     const body = JSON.stringify(this.payload());
     const multipartBody = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
