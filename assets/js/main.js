@@ -24,6 +24,16 @@ const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FOLDER_NAME = 'CodexBlanche';
 const DRIVE_FILE_NAME = 'codex_data.json';
 
+
+function getErrorMessage(error, fallback = '不明なエラー') {
+  if (!error) return fallback;
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message || fallback;
+  if (typeof error.error === 'string') return error.error;
+  if (typeof error.message === 'string') return error.message;
+  try { return JSON.stringify(error); } catch { return fallback; }
+}
+
 function readJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 }
@@ -75,7 +85,7 @@ const driveSync = {
         client_id: state.settings.googleClientId,
         scope: DRIVE_SCOPE,
         callback: (response) => {
-          if (response.error) throw new Error(response.error);
+          if (response?.error) throw new Error(getErrorMessage(response));
           this.accessToken = response.access_token;
           gapi.client.setToken({ access_token: response.access_token });
           this.setStatus('Drive: 接続済み');
@@ -88,7 +98,7 @@ const driveSync = {
     await new Promise((resolve, reject) => {
       const prev = this.tokenClient.callback;
       this.tokenClient.callback = (resp) => {
-        if (resp.error) { reject(new Error(resp.error)); return; }
+        if (resp?.error) { reject(new Error(getErrorMessage(resp))); return; }
         this.accessToken = resp.access_token;
         gapi.client.setToken({ access_token: resp.access_token });
         this.setStatus('Drive: 接続済み');
@@ -218,7 +228,7 @@ async function deletePersona(persona){if(!persona||!window.confirm(`プリセッ
 function renderSessionList(){const list=document.getElementById('session-list');list.innerHTML='';state.sessions.forEach((s)=>{const row=document.createElement('div');row.className='flex items-center gap-2';const btn=document.createElement('button');btn.className='flex-1 text-left p-2 rounded border dark:text-white';btn.innerText=s.title;btn.onclick=()=>{state.activeSessionId=s.id;persistState();renderHistory();toggleHistoryPanel();};const edit=document.createElement('button');edit.className='px-2 py-1 rounded bg-amber-600 text-white text-sm';edit.innerText='✏️';edit.setAttribute('aria-label',`会話「${s.title}」の名前を編集`);edit.onclick=()=>renameSessionById(s.id);const del=document.createElement('button');del.className='px-2 py-1 rounded bg-rose-700 text-white text-sm font-bold';del.innerText='×';del.setAttribute('aria-label',`会話「${s.title}」を削除`);del.onclick=()=>deleteSessionById(s.id);row.appendChild(btn);row.appendChild(edit);row.appendChild(del);list.appendChild(row);});}
 function saveSettings(){Object.entries({[STORAGE_KEYS.provider]:state.settings.provider,[STORAGE_KEYS.geminiModel]:state.settings.geminiModel,[STORAGE_KEYS.openaiModel]:state.settings.openaiModel,[STORAGE_KEYS.geminiKey]:state.settings.geminiKey,[STORAGE_KEYS.openaiKey]:state.settings.openaiKey,[STORAGE_KEYS.googleClientId]:state.settings.googleClientId,[STORAGE_KEYS.systemPrompt]:state.settings.systemPrompt,[STORAGE_KEYS.userSignature]:state.settings.userSignature,[STORAGE_KEYS.temperature]:state.settings.temperature,[STORAGE_KEYS.maxTokens]:state.settings.maxTokens}).forEach(([k,v])=>localStorage.setItem(k,v));}
 function applySettingsToUI(){syncContextSliderLimit();dom.provider.value=state.settings.provider;renderModelOptions();dom.geminiKey.value=state.settings.geminiKey;dom.openaiKey.value=state.settings.openaiKey;dom.googleClientId.value=state.settings.googleClientId;dom.systemPrompt.value=state.settings.systemPrompt;dom.userSignature.value=state.settings.userSignature;dom.temperature.value=state.settings.temperature;dom.temperatureValue.innerText=state.settings.temperature;dom.maxTokens.value=state.settings.maxTokens;dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}
-function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${e.message}`);}};googleLogoutBtn.onclick=async()=>{try{await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${e.message}`);}};}
+function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${getErrorMessage(e)}`);}};googleLogoutBtn.onclick=async()=>{try{await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${getErrorMessage(e)}`);}};}
 
 async function revealWithQuillEffect(el,text){
   el.classList.remove('reveal-fade-in');
