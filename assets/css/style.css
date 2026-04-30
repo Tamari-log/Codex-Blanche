@@ -325,17 +325,15 @@ body { font-family: 'Noto Serif JP', serif; }
     gap: 0.5rem;
 }
 .item-menu { position: relative; }
-.item-menu summary {
+.item-menu-toggle {
     list-style: none;
     cursor: pointer;
     color: #8b7355;
     padding: 0.15rem 0.35rem;
 }
-.dark .item-menu summary {
+.dark .item-menu-toggle {
     color: #cbd5e1;
 }
-.item-menu summary::marker,
-.item-menu summary::-webkit-details-marker { display: none; }
 .item-menu-pop {
     position: absolute;
     right: 0;
@@ -348,7 +346,7 @@ body { font-family: 'Noto Serif JP', serif; }
     display: none;
     z-index: 70;
 }
-.item-menu[open] .item-menu-pop { display: block; }
+.item-menu.is-open .item-menu-pop { display: block; }
 .item-menu-pop button {
     width: 100%;
     text-align: left;
