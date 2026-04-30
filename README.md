@@ -3,7 +3,13 @@
 自分のために作った、サーバーレスなAIクライアントです。  
 GitHubに置いてあるのは、URLを使うためです。使いたい人はどうぞ。
 https://tamari-log.github.io/Codex-Blanche/
+---
 
+## Live
+
+👉 https://tamari-log.github.io/Codex-Blanche/
+
+---
 ---
 
 ## 特徴
