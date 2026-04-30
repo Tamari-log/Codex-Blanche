@@ -13,6 +13,8 @@ const STORAGE_KEYS = {
   geminiKey: 'gemini_api_key',
   openaiKey: 'openai_api_key',
   googleClientId: 'google_client_id',
+  driveFolderName: 'drive_folder_name',
+  driveFileName: 'drive_file_name',
   systemPrompt: 'system_prompt',
   temperature: 'temperature',
   maxTokens: 'max_tokens',
@@ -22,8 +24,8 @@ const STORAGE_KEYS = {
   deletedAt: 'codex_deleted_at',
 };
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-const DRIVE_FOLDER_NAME = 'CodexBlanche';
-const DRIVE_FILE_NAME = 'codex_data.json';
+const DEFAULT_DRIVE_FOLDER_NAME = 'CodexBlanche';
+const DEFAULT_DRIVE_FILE_NAME = 'codex_data.json';
 const TOMBSTONE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 
@@ -40,7 +42,7 @@ function readJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 }
 
-const state = { sessions: readJSON(STORAGE_KEYS.sessions, []), activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId), personas: readJSON(STORAGE_KEYS.personas, []), hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []), settings: { provider: localStorage.getItem(STORAGE_KEYS.provider) || 'gemini', geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || 'gemini-3.1-pro-preview', openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || 'gpt-4.1-mini', geminiKey: localStorage.getItem(STORAGE_KEYS.geminiKey) || '', openaiKey: localStorage.getItem(STORAGE_KEYS.openaiKey) || '', googleClientId: localStorage.getItem(STORAGE_KEYS.googleClientId) || '', systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '', userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || 'Blanche', temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7), maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048) }, ui: { showSystemPresetPanel: false, activePersonaId: null } };
+const state = { sessions: readJSON(STORAGE_KEYS.sessions, []), activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId), personas: readJSON(STORAGE_KEYS.personas, []), hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []), settings: { provider: localStorage.getItem(STORAGE_KEYS.provider) || 'gemini', geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || 'gemini-3.1-pro-preview', openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || 'gpt-4.1-mini', geminiKey: localStorage.getItem(STORAGE_KEYS.geminiKey) || '', openaiKey: localStorage.getItem(STORAGE_KEYS.openaiKey) || '', googleClientId: localStorage.getItem(STORAGE_KEYS.googleClientId) || '', driveFolderName: localStorage.getItem(STORAGE_KEYS.driveFolderName) || DEFAULT_DRIVE_FOLDER_NAME, driveFileName: localStorage.getItem(STORAGE_KEYS.driveFileName) || DEFAULT_DRIVE_FILE_NAME, systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '', userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || 'Blanche', temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7), maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048) }, ui: { showSystemPresetPanel: false, activePersonaId: null } };
 const CONTEXT_LIMITS = { gemini: 150000, openai: 50000 };
 const MOBILE_MEDIA_QUERY = '(max-width: 768px), (pointer: coarse)';
 const SEND_BUTTON_DEFAULT_ICON = '🖋️';
@@ -58,6 +60,11 @@ const driveSync = {
     const run = this._opChain.then(() => operation());
     this._opChain = run.catch(() => {});
     return run;
+  },
+  getDriveFolderName() { return (state.settings.driveFolderName || DEFAULT_DRIVE_FOLDER_NAME).trim(); },
+  getDriveFileName() {
+    const normalized = (state.settings.driveFileName || DEFAULT_DRIVE_FILE_NAME).trim();
+    return normalized.endsWith('.json') ? normalized : `${normalized}.json`;
   },
   setStatus(text) { if (dom.driveStatus) dom.driveStatus.textContent = text; },
   async waitForGoogleLibs(timeoutMs = 10000) {
@@ -121,14 +128,16 @@ const driveSync = {
   async signOut() { await this.init(); this.accessToken = null; gapi.client.setToken(null); this.setStatus('Drive: 未接続'); },
   async ensureReady() { await this.init(); if (!this.accessToken) await this.signIn(false); await this.ensureFolderAndFile(); },
   async ensureFolderAndFile() {
-    const folderQ = `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const folderName = this.getDriveFolderName().replace(/'/g, "\\'");
+    const fileName = this.getDriveFileName().replace(/'/g, "\\'");
+    const folderQ = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
     const folder = await gapi.client.drive.files.list({ q: folderQ, fields: 'files(id,name)' });
     this.folderId = folder.result.files?.[0]?.id;
     if (!this.folderId) {
-      const created = await gapi.client.drive.files.create({ resource: { name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }, fields: 'id' });
+      const created = await gapi.client.drive.files.create({ resource: { name: folderName, mimeType: 'application/vnd.google-apps.folder' }, fields: 'id' });
       this.folderId = created.result.id;
     }
-    const fileQ = `name='${DRIVE_FILE_NAME}' and '${this.folderId}' in parents and trashed=false`;
+    const fileQ = `name='${fileName}' and '${this.folderId}' in parents and trashed=false`;
     const fileList = await gapi.client.drive.files.list({ q: fileQ, fields: 'files(id,name,modifiedTime)' });
     this.fileId = fileList.result.files?.[0]?.id || null;
   },
@@ -172,8 +181,8 @@ const driveSync = {
       this.setDeletedAt(Date.now());
     }
     const meta = this.fileId
-      ? { name: DRIVE_FILE_NAME, mimeType: 'application/json' }
-      : { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [this.folderId] };
+      ? { name: this.getDriveFileName(), mimeType: 'application/json' }
+      : { name: this.getDriveFileName(), mimeType: 'application/json', parents: [this.folderId] };
     const boundary = 'foo_bar_baz';
     const body = JSON.stringify(this.payload());
     const multipartBody = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
@@ -281,9 +290,9 @@ function applyPersona(persona){if(!persona)return;state.settings={...state.setti
 async function savePersona(){const name=document.getElementById('persona-name').value.trim();if(!name)return;state.personas.push({name,settings:{...state.settings}});await persistState();renderPersonaTabs();document.getElementById('persona-name').value='';}
 async function deletePersona(persona){if(!persona||!window.confirm(`プリセット「${persona.name}」を削除しますか？`))return;if(persona.isSystem)state.hiddenSystemPersonaIds.push(persona.id);else if(typeof persona.customIndex==='number')state.personas.splice(persona.customIndex,1);await persistState();renderPersonaTabs();}
 function renderSessionList(){const list=document.getElementById('session-list');list.innerHTML='';state.sessions.forEach((s)=>{const row=document.createElement('div');row.className='flex items-center gap-2';const btn=document.createElement('button');btn.className='flex-1 text-left p-2 rounded border dark:text-white';btn.innerText=s.title;btn.onclick=()=>{state.activeSessionId=s.id;persistState();renderHistory();toggleHistoryPanel();};const edit=document.createElement('button');edit.className='px-2 py-1 rounded bg-amber-600 text-white text-sm';edit.innerText='✏️';edit.setAttribute('aria-label',`会話「${s.title}」の名前を編集`);edit.onclick=()=>renameSessionById(s.id);const del=document.createElement('button');del.className='px-2 py-1 rounded bg-rose-700 text-white text-sm font-bold';del.innerText='×';del.setAttribute('aria-label',`会話「${s.title}」を削除`);del.onclick=()=>deleteSessionById(s.id);row.appendChild(btn);row.appendChild(edit);row.appendChild(del);list.appendChild(row);});}
-function saveSettings(){Object.entries({[STORAGE_KEYS.provider]:state.settings.provider,[STORAGE_KEYS.geminiModel]:state.settings.geminiModel,[STORAGE_KEYS.openaiModel]:state.settings.openaiModel,[STORAGE_KEYS.geminiKey]:state.settings.geminiKey,[STORAGE_KEYS.openaiKey]:state.settings.openaiKey,[STORAGE_KEYS.googleClientId]:state.settings.googleClientId,[STORAGE_KEYS.systemPrompt]:state.settings.systemPrompt,[STORAGE_KEYS.userSignature]:state.settings.userSignature,[STORAGE_KEYS.temperature]:state.settings.temperature,[STORAGE_KEYS.maxTokens]:state.settings.maxTokens}).forEach(([k,v])=>localStorage.setItem(k,v));}
-function applySettingsToUI(){syncContextSliderLimit();dom.provider.value=state.settings.provider;renderModelOptions();dom.geminiKey.value=state.settings.geminiKey;dom.openaiKey.value=state.settings.openaiKey;dom.googleClientId.value=state.settings.googleClientId;dom.systemPrompt.value=state.settings.systemPrompt;dom.userSignature.value=state.settings.userSignature;dom.temperature.value=state.settings.temperature;dom.temperatureValue.innerText=state.settings.temperature;dom.maxTokens.value=state.settings.maxTokens;dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}
-function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${getErrorMessage(e)}`);}};googleLogoutBtn.onclick=async()=>{try{await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${getErrorMessage(e)}`);}};}
+function saveSettings(){Object.entries({[STORAGE_KEYS.provider]:state.settings.provider,[STORAGE_KEYS.geminiModel]:state.settings.geminiModel,[STORAGE_KEYS.openaiModel]:state.settings.openaiModel,[STORAGE_KEYS.geminiKey]:state.settings.geminiKey,[STORAGE_KEYS.openaiKey]:state.settings.openaiKey,[STORAGE_KEYS.googleClientId]:state.settings.googleClientId,[STORAGE_KEYS.driveFolderName]:state.settings.driveFolderName,[STORAGE_KEYS.driveFileName]:state.settings.driveFileName,[STORAGE_KEYS.systemPrompt]:state.settings.systemPrompt,[STORAGE_KEYS.userSignature]:state.settings.userSignature,[STORAGE_KEYS.temperature]:state.settings.temperature,[STORAGE_KEYS.maxTokens]:state.settings.maxTokens}).forEach(([k,v])=>localStorage.setItem(k,v));}
+function applySettingsToUI(){syncContextSliderLimit();dom.provider.value=state.settings.provider;renderModelOptions();dom.geminiKey.value=state.settings.geminiKey;dom.openaiKey.value=state.settings.openaiKey;dom.googleClientId.value=state.settings.googleClientId;dom.driveFolderName.value=state.settings.driveFolderName;dom.driveFileName.value=state.settings.driveFileName;dom.systemPrompt.value=state.settings.systemPrompt;dom.userSignature.value=state.settings.userSignature;dom.temperature.value=state.settings.temperature;dom.temperatureValue.innerText=state.settings.temperature;dom.maxTokens.value=state.settings.maxTokens;dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}
+function bindSettings(){const {provider,model,geminiKey,openaiKey,googleClientId,driveFolderName,driveFileName,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value;syncContextSliderLimit();applySettingsToUI();saveSettings();};model.onchange=()=>{state.settings[state.settings.provider==='gemini'?'geminiModel':'openaiModel']=model.value;saveSettings();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};driveFolderName.onchange=()=>{state.settings.driveFolderName=driveFolderName.value.trim()||DEFAULT_DRIVE_FOLDER_NAME;driveSync.folderId=null;driveSync.fileId=null;saveSettings();};driveFileName.onchange=()=>{state.settings.driveFileName=driveFileName.value.trim()||DEFAULT_DRIVE_FILE_NAME;driveSync.fileId=null;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{state.settings.temperature=Number(temperature.value);dom.temperatureValue.innerText=temperature.value;saveSettings();};maxTokens.oninput=()=>{state.settings.maxTokens=Number(maxTokens.value);dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;saveSettings();};clearSystemPromptBtn.onclick=()=>{state.settings.systemPrompt='';systemPrompt.value='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(true);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${getErrorMessage(e)}`);}};googleLogoutBtn.onclick=async()=>{try{await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${getErrorMessage(e)}`);}};}
 
 async function revealWithQuillEffect(el,text){
   el.classList.remove('reveal-fade-in');
@@ -367,4 +376,4 @@ userInput.addEventListener('keydown', function (e) {
     handleSend();
   }
 });
-window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','settings-back-btn'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); setThinkingMode(false); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); bindSettingsNavigation(); renderSettingsView(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
+window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','settings-back-btn'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); setThinkingMode(false); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); bindSettingsNavigation(); renderSettingsView(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
