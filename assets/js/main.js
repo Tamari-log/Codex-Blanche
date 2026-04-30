@@ -45,6 +45,7 @@ const SEND_BUTTON_DEFAULT_ICON = '🖋️';
 const SEND_BUTTON_STOP_ICON = '⏹️';
 const SYSTEM_PERSONAS = [{ id: 'sys-neutral', name: '標準', settings: { systemPrompt: '' } }, { id: 'sys-creative', name: '創作補助', settings: { temperature: 1.0, systemPrompt: 'あなたは創作支援に強いアシスタントです。複数案を提示し、改善点を具体的に示してください。' } }, { id: 'sys-concise', name: '簡潔回答', settings: { temperature: 0.3, systemPrompt: '要点を短く、箇条書き中心で回答してください。' } }];
 const MODEL_OPTIONS = { gemini: [{ value: 'gemini-3-flash-preview', label: 'gemini 3 flash（高速）' }, { value: 'gemini-3.1-flash-lite-preview', label: 'gemini 3.1 flash lite（新しい高速）' }, { value: 'gemini-3.1-pro-preview', label: 'gemini 3.1 pro（高性能）' }], openai: [{ value: 'gpt-4.1-mini', label: 'gpt-4.1-mini（高速）' }, { value: 'gpt-4.1', label: 'gpt-4.1（高性能）' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini（軽量）' }] };
+const settingsNav = { stack: ['settings-view-root'] };
 
 const driveSync = {
   tokenClient: null, accessToken: null, folderId: null, fileId: null,
@@ -271,8 +272,44 @@ async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[in
 async function deleteSessionById(sessionId){const target=state.sessions.find((x)=>x.id===sessionId);if(!target)return;const confirmed=window.confirm(`会話「${target.title}」を削除しますか？\nこの操作は取り消せません。`);if(!confirmed)return;state.sessions=state.sessions.filter((x)=>x.id!==target.id);if(state.sessions.length===0){await startNewSession();return;}if(state.activeSessionId===target.id)state.activeSessionId=state.sessions[0].id;await persistState();renderHistory();renderSessionList();}
 async function deleteActiveSession(){const s=getActiveSession();if(!s)return;await deleteSessionById(s.id);}
 async function renameSessionById(sessionId){const session=state.sessions.find((x)=>x.id===sessionId);if(!session)return;const nextName=window.prompt('会話名を入力してください',session.title);if(nextName===null)return;const normalized=nextName.trim();if(!normalized)return;session.title=normalized;await persistState();renderSessionList();}
+
+function updateSettingsHeader(){
+  const currentId = settingsNav.stack[settingsNav.stack.length - 1];
+  const currentView = document.getElementById(currentId);
+  const viewTitle = currentView?.dataset?.viewTitle || currentView?.querySelector('.settings-view-title')?.textContent || '設定';
+  if (dom.settingsTitle) dom.settingsTitle.textContent = viewTitle;
+  if (dom.settingsBackBtn) dom.settingsBackBtn.classList.toggle('hidden', settingsNav.stack.length <= 1);
+}
+function renderSettingsView(){
+  document.querySelectorAll('.settings-view').forEach((view)=>view.classList.add('hidden'));
+  const currentId = settingsNav.stack[settingsNav.stack.length - 1];
+  const activeView = document.getElementById(currentId);
+  if (activeView) activeView.classList.remove('hidden');
+  updateSettingsHeader();
+}
+function goToSettingsView(viewId){
+  if (!document.getElementById(viewId)) return;
+  settingsNav.stack.push(viewId);
+  renderSettingsView();
+}
+function goBackSettingsView(){
+  if (settingsNav.stack.length <= 1) return;
+  settingsNav.stack.pop();
+  renderSettingsView();
+}
+function bindSettingsNavigation(){
+  document.querySelectorAll('[data-settings-view]').forEach((btn)=>{
+    btn.addEventListener('click',()=>goToSettingsView(btn.dataset.settingsView));
+  });
+  if (dom.settingsBackBtn) dom.settingsBackBtn.onclick = goBackSettingsView;
+}
 function toggleSettings() {
-  document.getElementById('settings-modal').classList.toggle('hidden');
+  const modal = document.getElementById('settings-modal');
+  modal.classList.toggle('hidden');
+  if (!modal.classList.contains('hidden')) {
+    settingsNav.stack = ['settings-view-root'];
+    renderSettingsView();
+  }
 }
 
 function toggleHistoryPanel() {
@@ -294,4 +331,4 @@ userInput.addEventListener('keydown', function (e) {
     handleSend();
   }
 });
-window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); setThinkingMode(false); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
+window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','settings-back-btn'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); setThinkingMode(false); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); bindSettingsNavigation(); renderSettingsView(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
