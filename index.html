@@ -26,7 +26,7 @@
 
 <body class="bg-[#e3cfaa] dark:bg-slate-900 transition-colors duration-300">
     <div class="app-shell flex flex-col h-[100dvh] max-w-md mx-auto shadow-2xl bg-[#e8d8b3] dark:bg-slate-800 transition-colors duration-300 overflow-hidden">
-        <header class="pt-[env(safe-area-inset-top)] px-4 pb-4 border-b dark:border-slate-700 flex justify-between items-center bg-[#e8d8b3]/90 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-50">
+        <header id="chat-header" class="pt-[env(safe-area-inset-top)] px-4 pb-4 border-b dark:border-slate-700 flex justify-between items-center bg-[#e8d8b3]/90 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-50">
             <h1 class="text-xl font-serif font-bold tracking-widest text-[#40260f] dark:text-slate-200">CODEX BLANCHE</h1>
             <div class="flex gap-2">
                 <button id="drive-sync-btn" onclick="syncWithDrive()" class="p-2 text-xl grayscale dark:invert opacity-70" title="Googleドライブ同期">☁️</button>
@@ -59,6 +59,9 @@
                 </div>
             </div>
         </footer>
+
+
+        <button id="scroll-to-bottom-btn" class="scroll-to-bottom-btn" type="button" aria-label="最下部へ移動" title="最下部へ移動">↓</button>
 
         <aside id="history-panel" class="hidden absolute inset-0 bg-black/60 z-40">
             <div class="absolute right-0 top-0 h-full w-72 bg-white dark:bg-slate-900 p-4 overflow-y-auto">
