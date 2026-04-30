@@ -2,6 +2,7 @@
 
 自分のために作った、サーバーレスなAIクライアントです。  
 GitHubに置いてあるのは、URLを使うためです。使いたい人はどうぞ。
+🇺🇸 English version → ./README.en.md
 
 ---
 
