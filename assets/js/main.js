@@ -249,6 +249,17 @@ function downloadJsonFile(filename, payload) {
   URL.revokeObjectURL(url);
 }
 
+function toSafeFilename(value, fallback = 'world') {
+  const text = String(value || '').trim();
+  if (!text) return fallback;
+  return text
+    .replace(/[\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, '_')
+    .replace(/[^\w\-.ぁ-んァ-ヶ一-龠]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-_.]+|[-_.]+$/g, '') || fallback;
+}
+
 async function handleConversationJsonPick() {
   dom.conversationJsonInput?.click();
 }
@@ -269,9 +280,19 @@ async function runConversationJsonExtraction() {
     const groups = extractConversationGroupsByWorld(parsed);
     const worldCount = Object.keys(groups).length;
     if (!worldCount) throw new Error('会話形式JSONを検出できませんでした。');
-    const output = sanitizeConversationJsonNode({ exportedAt: new Date().toISOString(), sourceFileName: selectedConversationSourceFile.name, worlds: groups });
-    downloadJsonFile(`conversation_by_world_${Date.now()}.json`, output);
-    if (dom.conversationJsonStatus) dom.conversationJsonStatus.textContent = `${worldCount}件の世界設定を抽出して保存しました。`;
+    const exportedAt = new Date().toISOString();
+    const timestamp = Date.now();
+    Object.entries(groups).forEach(([worldName, sessions], index) => {
+      const output = sanitizeConversationJsonNode({
+        exportedAt,
+        sourceFileName: selectedConversationSourceFile.name,
+        worldName,
+        sessions,
+      });
+      const worldToken = toSafeFilename(worldName, `world-${index + 1}`);
+      downloadJsonFile(`conversation_${worldToken}_${timestamp}.json`, output);
+    });
+    if (dom.conversationJsonStatus) dom.conversationJsonStatus.textContent = `${worldCount}件の世界設定ごとにJSONを分けて保存しました。`;
   } catch (error) {
     const message = `抽出失敗: ${getErrorMessage(error)}`;
     if (dom.conversationJsonStatus) dom.conversationJsonStatus.textContent = message;
