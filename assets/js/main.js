@@ -49,6 +49,12 @@ const MODEL_OPTIONS = { gemini: [{ value: 'gemini-3-flash-preview', label: 'gemi
 const driveSync = {
   tokenClient: null, accessToken: null, folderId: null, fileId: null,
   _initPromise: null,
+  _opChain: Promise.resolve(),
+  enqueue(operation) {
+    const run = this._opChain.then(() => operation());
+    this._opChain = run.catch(() => {});
+    return run;
+  },
   setStatus(text) { if (dom.driveStatus) dom.driveStatus.textContent = text; },
   async waitForGoogleLibs(timeoutMs = 10000) {
     const startedAt = Date.now();
@@ -132,17 +138,21 @@ const driveSync = {
     const hasMessages = state.sessions.some((session) => (session.messages?.length || 0) > 0);
     return hasPersonas || hasMessages;
   },
-  async deleteRemoteFile() {
-    await this.ensureReady();
+  async _deleteRemoteFileInternal() {
     if (!this.fileId) return;
     await gapi.client.drive.files.delete({ fileId: this.fileId });
     this.fileId = null;
     this.setStatus(`Drive: ファイル削除済み ${new Date().toLocaleTimeString('ja-JP')}`);
   },
-  async push() {
-    await this.ensureReady();
+  async deleteRemoteFile() {
+    return this.enqueue(async () => {
+      await this.ensureReady();
+      await this._deleteRemoteFileInternal();
+    });
+  },
+  async _pushInternal() {
     if (!this.hasSyncData()) {
-      await this.deleteRemoteFile();
+      await this._deleteRemoteFileInternal();
       return;
     }
     const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [this.folderId] };
@@ -155,28 +165,36 @@ const driveSync = {
     if (fileMeta?.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
     this.setStatus(`Drive: 同期済み ${new Date().toLocaleTimeString('ja-JP')}`);
   },
+  async push() {
+    return this.enqueue(async () => {
+      await this.ensureReady();
+      await this._pushInternal();
+    });
+  },
   async pull() {
-    await this.ensureReady();
-    if (!this.fileId) return;
-    const fileMeta = await gapi.client.drive.files.get({ fileId: this.fileId, fields: 'modifiedTime' });
-    const remoteModifiedAt = Date.parse(fileMeta.result?.modifiedTime || '') || 0;
-    const localUpdatedAt = this.getLocalUpdatedAt();
-    const lastRemoteModifiedAt = this.getLastRemoteModifiedAt();
-    const hasUnsyncedLocalChanges = this.hasSyncData() && localUpdatedAt > lastRemoteModifiedAt;
-    if (hasUnsyncedLocalChanges && localUpdatedAt > remoteModifiedAt) {
-      await this.push();
-      this.setStatus(`Drive: ローカルを優先して上書き同期 ${new Date().toLocaleTimeString('ja-JP')}`);
-      return;
-    }
-    const r = await gapi.client.drive.files.get({ fileId: this.fileId, alt: 'media' });
-    if (r.result?.sessions) state.sessions = r.result.sessions;
-    if (r.result?.personas) state.personas = r.result.personas;
-    if (!state.sessions.length) startNewSession();
-    if (!state.activeSessionId || !state.sessions.find((s) => s.id === state.activeSessionId)) state.activeSessionId = state.sessions[0]?.id || null;
-    await persistState({ syncDrive: false });
-    if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
-    renderHistory(); renderSessionList(); renderPersonaTabs();
-    this.setStatus(`Drive: 取得済み ${new Date().toLocaleTimeString('ja-JP')}`);
+    return this.enqueue(async () => {
+      await this.ensureReady();
+      if (!this.fileId) return;
+      const fileMeta = await gapi.client.drive.files.get({ fileId: this.fileId, fields: 'modifiedTime' });
+      const remoteModifiedAt = Date.parse(fileMeta.result?.modifiedTime || '') || 0;
+      const localUpdatedAt = this.getLocalUpdatedAt();
+      const lastRemoteModifiedAt = this.getLastRemoteModifiedAt();
+      const hasUnsyncedLocalChanges = this.hasSyncData() && localUpdatedAt > lastRemoteModifiedAt;
+      if (hasUnsyncedLocalChanges && localUpdatedAt > remoteModifiedAt) {
+        await this._pushInternal();
+        this.setStatus(`Drive: ローカルを優先して上書き同期 ${new Date().toLocaleTimeString('ja-JP')}`);
+        return;
+      }
+      const r = await gapi.client.drive.files.get({ fileId: this.fileId, alt: 'media' });
+      if (r.result?.sessions) state.sessions = r.result.sessions;
+      if (r.result?.personas) state.personas = r.result.personas;
+      if (!state.sessions.length) startNewSession();
+      if (!state.activeSessionId || !state.sessions.find((s) => s.id === state.activeSessionId)) state.activeSessionId = state.sessions[0]?.id || null;
+      await persistState({ syncDrive: false });
+      if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
+      renderHistory(); renderSessionList(); renderPersonaTabs();
+      this.setStatus(`Drive: 取得済み ${new Date().toLocaleTimeString('ja-JP')}`);
+    });
   },
 };
 
