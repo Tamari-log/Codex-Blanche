@@ -52,6 +52,104 @@ This is **not** a beginner-friendly product.
 
 ---
 
+## Features
+
+### Core
+
+- AI Chat (Gemini / OpenAI)
+  - Switch between providers
+  - Select models per provider
+  - Unified chat interface
+
+- System Prompt Control
+  - Custom system instructions
+  - Preset system personas
+  - Save and reuse configurations
+
+- Generation Settings
+  - Temperature control
+  - Max token (context length) control
+
+---
+
+### Data & Persistence
+
+- Local State Management
+  - Chat sessions stored in browser storage
+  - Personas and settings persisted locally
+
+- Google Drive Sync
+  - Sync sessions and settings across devices
+  - Automatic push / pull on login
+  - Conflict handling using timestamps
+
+- Session-Based API Key Storage
+  - API keys stored in sessionStorage
+  - Cleared when browser session ends
+
+---
+
+### Chat Experience
+
+- Editable Messages
+  - Inline editing of past messages
+  - Changes are persisted automatically
+
+- Regenerate Responses
+  - Retry AI responses from any point
+
+- Session Management
+  - Multiple chat sessions
+  - Rename, delete, pin sessions
+
+---
+
+### UI / UX
+
+- Minimal, Focused Interface
+  - Chat-first layout
+  - Mobile-friendly design
+
+- Dark / Light Mode
+  - Toggleable theme
+
+- Persona Panel
+  - Sidebar for switching presets and sessions
+  - Search within chat history
+
+---
+
+### Developer Features
+
+- Built-in Log Viewer
+  - Captures console logs (log / warn / error)
+  - Accessible via advanced settings
+
+- Error Handling
+  - API error messages surfaced in UI
+  - Abortable requests (cancel generation)
+
+- Modular Structure
+  - Separated UI / API / Sync logic
+  - Dependency-injected sync module
+
+---
+
+### Architecture
+
+- Fully Client-Side
+  - No backend required
+
+- User-Owned Data
+  - No server-side storage
+  - Optional cloud sync via user’s Google Drive
+
+- Simple Sync Model
+  - Timestamp-based conflict resolution
+  - Tombstone-based deletion handling
+
+---
+
 ## Notes
 
 * API keys are stored in browser session storage
