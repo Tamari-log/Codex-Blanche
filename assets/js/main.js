@@ -145,6 +145,7 @@ function installConsoleLogHook() {
 let driveSync = null;
 
 let selectedConversationSourceFile = null;
+let selectedConversationHistoryOnlySourceFile = null;
 
 
 const SENSITIVE_CONVERSATION_KEYS = new Set([
@@ -218,6 +219,26 @@ function extractConversationGroupsByWorld(data) {
   return groups;
 }
 
+function extractConversationHistoryOnly(data) {
+  const sessions = [];
+  const pushSession = (session) => {
+    if (!session || !Array.isArray(session.messages)) return;
+    const normalized = normalizeImportedSession(session, sessions.length);
+    if (!normalized.messages.length) return;
+    sessions.push({ messages: normalized.messages });
+  };
+
+  if (Array.isArray(data)) data.forEach(pushSession);
+  if (Array.isArray(data?.sessions)) data.sessions.forEach(pushSession);
+  if (Array.isArray(data?.worlds)) {
+    data.worlds.forEach((world) => {
+      const candidates = Array.isArray(world?.sessions) ? world.sessions : Array.isArray(world?.conversations) ? world.conversations : [];
+      candidates.forEach(pushSession);
+    });
+  }
+  return sessions;
+}
+
 function downloadJsonFile(filename, payload) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -254,6 +275,35 @@ async function runConversationJsonExtraction() {
   } catch (error) {
     const message = `抽出失敗: ${getErrorMessage(error)}`;
     if (dom.conversationJsonStatus) dom.conversationJsonStatus.textContent = message;
+    window.alert(message);
+  }
+}
+
+async function handleConversationHistoryOnlyJsonPick() {
+  dom.conversationHistoryOnlyJsonInput?.click();
+}
+
+async function handleConversationHistoryOnlyJsonInputChange(event) {
+  selectedConversationHistoryOnlySourceFile = event?.target?.files?.[0] || null;
+  if (dom.conversationHistoryOnlyJsonStatus) dom.conversationHistoryOnlyJsonStatus.textContent = selectedConversationHistoryOnlySourceFile ? `選択中: ${selectedConversationHistoryOnlySourceFile.name}` : '未選択';
+}
+
+async function runConversationHistoryOnlyJsonExtraction() {
+  if (!selectedConversationHistoryOnlySourceFile) {
+    window.alert('先にJSONファイルを選択してください。');
+    return;
+  }
+  try {
+    const sourceText = await selectedConversationHistoryOnlySourceFile.text();
+    const parsed = JSON.parse(sourceText);
+    const sessions = extractConversationHistoryOnly(parsed);
+    if (!sessions.length) throw new Error('会話履歴を検出できませんでした。');
+    const output = sanitizeConversationJsonNode({ exportedAt: new Date().toISOString(), sourceFileName: selectedConversationHistoryOnlySourceFile.name, sessions });
+    downloadJsonFile(`conversation_history_only_${Date.now()}.json`, output);
+    if (dom.conversationHistoryOnlyJsonStatus) dom.conversationHistoryOnlyJsonStatus.textContent = `${sessions.length}件の会話履歴を抽出して保存しました。`;
+  } catch (error) {
+    const message = `抽出失敗: ${getErrorMessage(error)}`;
+    if (dom.conversationHistoryOnlyJsonStatus) dom.conversationHistoryOnlyJsonStatus.textContent = message;
     window.alert(message);
   }
 }
@@ -430,7 +480,7 @@ userInput.addEventListener('keydown', function (e) {
     handleSend();
   }
 });
-window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, appDom?.createDomRegistry ? appDom.createDomRegistry(['provider','model','gemini-key','openai-key','remember-api-keys','remember-google-login','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','chat-header','scroll-to-bottom-btn','settings-back-btn','dev-log-list','attach-menu-btn','image-upload-input','file-upload-input','chat-import-input','conversation-json-input','conversation-json-pick-btn','conversation-json-run-btn','conversation-json-status']) : {}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
+window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, appDom?.createDomRegistry ? appDom.createDomRegistry(['provider','model','gemini-key','openai-key','remember-api-keys','remember-google-login','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','chat-header','scroll-to-bottom-btn','settings-back-btn','dev-log-list','attach-menu-btn','image-upload-input','file-upload-input','chat-import-input','conversation-json-input','conversation-json-pick-btn','conversation-json-run-btn','conversation-json-status','conversation-history-only-json-input','conversation-history-only-json-pick-btn','conversation-history-only-json-run-btn','conversation-history-only-json-status']) : {}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
   document.addEventListener('visibilitychange', handleVisibilityDuringGeneration);
   dom.chatHeader?.addEventListener('click', (e) => {
     if (e.target.closest('button')) return;
@@ -444,6 +494,9 @@ window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, app
   dom.conversationJsonPickBtn?.addEventListener('click', handleConversationJsonPick);
   dom.conversationJsonInput?.addEventListener('change', handleConversationJsonInputChange);
   dom.conversationJsonRunBtn?.addEventListener('click', runConversationJsonExtraction);
+  dom.conversationHistoryOnlyJsonPickBtn?.addEventListener('click', handleConversationHistoryOnlyJsonPick);
+  dom.conversationHistoryOnlyJsonInput?.addEventListener('change', handleConversationHistoryOnlyJsonInputChange);
+  dom.conversationHistoryOnlyJsonRunBtn?.addEventListener('click', runConversationHistoryOnlyJsonExtraction);
   chatArea?.addEventListener('scroll', updateScrollToBottomButtonVisibility);
   if (!appApi || !appSync) {
     console.error('[init] 必須依存(appApi/appSync)が不足しているため初期化を中止します。');
