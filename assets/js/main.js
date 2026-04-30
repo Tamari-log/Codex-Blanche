@@ -288,9 +288,21 @@ function toggleDarkMode(){document.documentElement.classList.toggle('dark');loca
 async function syncWithDrive(){try{await driveSync.pull();}catch(e){driveSync.setStatus(`同期失敗: ${e.message}`);}}
 window.syncWithDrive = syncWithDrive;
 document.addEventListener('click',(event)=>{const btn=event.target.closest('.settings-action-btn');if(btn){btn.classList.remove('is-pressed');requestAnimationFrame(()=>{btn.classList.add('is-pressed');setTimeout(()=>btn.classList.remove('is-pressed'),170);});}document.querySelectorAll('.item-menu.is-open').forEach((menu)=>{if(!menu.contains(event.target))menu.classList.remove('is-open');});});
+function syncComposerGrowOffset() {
+  if (!userInput || !document?.documentElement) return;
+  const computed = window.getComputedStyle(userInput);
+  const lineHeight = Number.parseFloat(computed.lineHeight) || 0;
+  const paddingTop = Number.parseFloat(computed.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(computed.paddingBottom) || 0;
+  const baseHeight = lineHeight + paddingTop + paddingBottom;
+  const growOffset = Math.max(0, userInput.offsetHeight - baseHeight);
+  document.documentElement.style.setProperty('--composer-grow-offset', `${growOffset}px`);
+}
+
 userInput.addEventListener('input', function () {
   this.style.height = 'auto';
   this.style.height = `${this.scrollHeight}px`;
+  syncComposerGrowOffset();
 });
 
 userInput.addEventListener('keydown', function (e) {
@@ -311,4 +323,4 @@ window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, app
     console.error('[init] 必須依存(appApi/appSync)が不足しているため初期化を中止します。');
     return;
   }
-  driveSync = appSync.createDriveSync({ state, dom, STORAGE_KEYS, DEFAULT_DRIVE_FOLDER_NAME, DEFAULT_DRIVE_FILE_NAME, DRIVE_SCOPE, TOMBSTONE_RETENTION_MS, CONFLICT_TIME_BUFFER_MS, getErrorMessage, startNewSession, persistState, renderHistory, renderSessionList, renderPersonaTabs }); appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON }); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); bindSettingsNavigation(); renderSettingsView(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); renderDevLogs(); updateScrollToBottomButtonVisibility(); try { await driveSync.init(); if (state.settings.rememberGoogleLogin) { try { await driveSync.signIn(false); await driveSync.pull(); } catch (e) { driveSync.setStatus(`Drive自動接続失敗: ${getErrorMessage(e)}`); } } } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
+  driveSync = appSync.createDriveSync({ state, dom, STORAGE_KEYS, DEFAULT_DRIVE_FOLDER_NAME, DEFAULT_DRIVE_FILE_NAME, DRIVE_SCOPE, TOMBSTONE_RETENTION_MS, CONFLICT_TIME_BUFFER_MS, getErrorMessage, startNewSession, persistState, renderHistory, renderSessionList, renderPersonaTabs }); appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON }); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); bindSettingsNavigation(); renderSettingsView(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); renderDevLogs(); updateScrollToBottomButtonVisibility(); syncComposerGrowOffset(); try { await driveSync.init(); if (state.settings.rememberGoogleLogin) { try { await driveSync.signIn(false); await driveSync.pull(); } catch (e) { driveSync.setStatus(`Drive自動接続失敗: ${getErrorMessage(e)}`); } } } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
