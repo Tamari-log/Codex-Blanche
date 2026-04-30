@@ -46,6 +46,8 @@ const appUi = resolveAppDependency('appUi', {
 });
 const appApi = resolveAppDependency('appApi');
 const appSync = resolveAppDependency('appSync');
+const appState = resolveAppDependency('appState');
+const appDom = resolveAppDependency('appDom');
 
 
 function getErrorMessage(error, fallback = '不明なエラー') {
@@ -61,7 +63,9 @@ function readJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 }
 
-const state = { sessions: readJSON(STORAGE_KEYS.sessions, []), activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId), personas: readJSON(STORAGE_KEYS.personas, []), hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []), settings: { provider: localStorage.getItem(STORAGE_KEYS.provider) || 'gemini', geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || 'gemini-3.1-pro-preview', openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || 'gpt-4.1-mini', geminiKey: sessionStorage.getItem(STORAGE_KEYS.geminiKey) || localStorage.getItem(STORAGE_KEYS.geminiKey) || '', openaiKey: sessionStorage.getItem(STORAGE_KEYS.openaiKey) || localStorage.getItem(STORAGE_KEYS.openaiKey) || '', googleClientId: localStorage.getItem(STORAGE_KEYS.googleClientId) || '', driveFolderName: localStorage.getItem(STORAGE_KEYS.driveFolderName) || DEFAULT_DRIVE_FOLDER_NAME, driveFileName: localStorage.getItem(STORAGE_KEYS.driveFileName) || DEFAULT_DRIVE_FILE_NAME, systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '', userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || 'Blanche', temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7), maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048) }, ui: { showSystemPresetPanel: false, activePersonaId: null }, devLogs: [] };
+const initialState = { sessions: readJSON(STORAGE_KEYS.sessions, []), activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId), personas: readJSON(STORAGE_KEYS.personas, []), hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []), settings: { provider: localStorage.getItem(STORAGE_KEYS.provider) || 'gemini', geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || 'gemini-3.1-pro-preview', openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || 'gpt-4.1-mini', geminiKey: sessionStorage.getItem(STORAGE_KEYS.geminiKey) || localStorage.getItem(STORAGE_KEYS.geminiKey) || '', openaiKey: sessionStorage.getItem(STORAGE_KEYS.openaiKey) || localStorage.getItem(STORAGE_KEYS.openaiKey) || '', googleClientId: localStorage.getItem(STORAGE_KEYS.googleClientId) || '', driveFolderName: localStorage.getItem(STORAGE_KEYS.driveFolderName) || DEFAULT_DRIVE_FOLDER_NAME, driveFileName: localStorage.getItem(STORAGE_KEYS.driveFileName) || DEFAULT_DRIVE_FILE_NAME, systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '', userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || 'Blanche', temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7), maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048) }, ui: { showSystemPresetPanel: false, activePersonaId: null }, devLogs: [] };
+const stateStore = appState?.createStore ? appState.createStore(initialState) : { getState: () => initialState };
+const state = stateStore.getState();
 const CONTEXT_LIMITS = { gemini: 150000, openai: 50000 };
 const MOBILE_MEDIA_QUERY = '(max-width: 768px), (pointer: coarse)';
 const SEND_BUTTON_DEFAULT_ICON = '🖋️';
@@ -125,7 +129,7 @@ async function persistState({ syncDrive = true } = {}) { localStorage.setItem(ST
 
 // below mostly original
 function renderModelOptions() {
-  const model = document.getElementById('model');
+  const model = dom.model;
   if (!model) return;
 
   const provider = state.settings.provider;
@@ -150,7 +154,7 @@ function renderModelOptions() {
   }
 }
 function syncContextSliderLimit() {
-  const maxTokens = document.getElementById('max-tokens');
+  const maxTokens = dom.maxTokens;
   const limit = CONTEXT_LIMITS[state.settings.provider] || 8192;
   maxTokens.max = String(limit);
   if (state.settings.maxTokens > limit) {
@@ -245,7 +249,7 @@ userInput.addEventListener('keydown', function (e) {
     handleSend();
   }
 });
-window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','settings-back-btn','dev-log-list'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
+window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, appDom?.createDomRegistry ? appDom.createDomRegistry(['provider','model','gemini-key','openai-key','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','settings-back-btn','dev-log-list']) : {}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
   if (!appApi || !appSync) {
     console.error('[init] 必須依存(appApi/appSync)が不足しているため初期化を中止します。');
     return;
