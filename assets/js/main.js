@@ -154,7 +154,8 @@ const driveSync = {
     const lastRemoteModifiedAt = this.getLastRemoteModifiedAt();
     const hasUnsyncedLocalChanges = localUpdatedAt > lastRemoteModifiedAt;
     if (hasUnsyncedLocalChanges && localUpdatedAt > remoteModifiedAt) {
-      this.setStatus(`Drive: 取得を中止（ローカルが新しい） ${new Date().toLocaleTimeString('ja-JP')}`);
+      await this.push();
+      this.setStatus(`Drive: ローカルを優先して上書き同期 ${new Date().toLocaleTimeString('ja-JP')}`);
       return;
     }
     const r = await gapi.client.drive.files.get({ fileId: this.fileId, alt: 'media' });
