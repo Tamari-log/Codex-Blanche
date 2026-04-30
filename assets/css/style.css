@@ -116,6 +116,29 @@ body { font-family: 'Noto Serif JP', serif; }
     background-image: url('https://www.transparenttextures.com/patterns/dark-matter.png');
 }
 
+.emoji-icon-btn {
+    border: 1px solid rgba(184, 157, 116, 0.8);
+    border-radius: 0.75rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    line-height: 1;
+    background: rgba(255, 255, 255, 0.45);
+    transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.emoji-icon-btn:active {
+    transform: scale(0.94);
+}
+
+.dark .emoji-icon-btn {
+    border-color: #475569;
+    background: rgba(30, 41, 59, 0.8);
+}
+
 .preset-toggle-btn {
     border: 1px solid #b89d74;
     border-radius: 0.75rem;
@@ -124,8 +147,8 @@ body { font-family: 'Noto Serif JP', serif; }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex-direction: column;
-    gap: 0.28rem;
+    font-size: 1.25rem;
+    line-height: 1;
     background: rgba(255, 255, 255, 0.55);
     transition: all 0.2s ease;
 }
@@ -193,29 +216,6 @@ body { font-family: 'Noto Serif JP', serif; }
     transform: translateX(0);
 }
 
-.hamburger-line {
-    width: 1.2rem;
-    height: 2px;
-    background: #40260f;
-    border-radius: 9999px;
-    transition: transform 0.28s ease, opacity 0.28s ease, background 0.2s ease;
-}
-
-.dark .hamburger-line {
-    background: #f8fafc;
-}
-
-.preset-toggle-btn.is-open .hamburger-line:nth-child(1) {
-    transform: translateY(0.4rem) rotate(45deg);
-}
-
-.preset-toggle-btn.is-open .hamburger-line:nth-child(2) {
-    opacity: 0;
-}
-
-.preset-toggle-btn.is-open .hamburger-line:nth-child(3) {
-    transform: translateY(-0.4rem) rotate(-45deg);
-}
 
 .persona-tab-btn {
     border: 1px solid #b89d74;
