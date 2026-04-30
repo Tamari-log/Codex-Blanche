@@ -113,6 +113,10 @@
                         <select id="model" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white"></select>
                         <input type="password" id="gemini-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Gemini API Key">
                         <input type="password" id="openai-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="OpenAI API Key">
+                        <label class="flex items-center gap-2 text-sm dark:text-white">
+                            <input type="checkbox" id="remember-api-keys" class="h-4 w-4">
+                            APIキーをこの端末に保存する（localStorage）
+                        </label>
                     </div>
 
                     <div id="view-ai-behavior" class="settings-view hidden space-y-3" data-view-title="振る舞い設定画面">
@@ -145,7 +149,7 @@
 
                     <div id="view-dev-logs" class="settings-view hidden space-y-3" data-view-title="ログ">
                         <h3 class="settings-view-title">ログ（開発者向けエラーログなど）表示画面</h3>
-                        <p class="text-xs text-slate-600 dark:text-slate-300">APIキーはセッション中のみ保存されます（sessionStorage）。端末を閉じると消去されます。</p>
+                        <p class="text-xs text-slate-600 dark:text-slate-300">APIキーは「この端末に保存」をONにするとlocalStorageへ保存されます。OFF時はsessionStorageのみ利用します。</p>
                         <ul id="dev-log-list" class="space-y-2 max-h-56 overflow-y-auto"></ul>
                         <button onclick="startNewSession()" class="w-full bg-slate-600 text-white py-2 rounded-lg settings-action-btn">新規会話を開始</button>
                     </div>
