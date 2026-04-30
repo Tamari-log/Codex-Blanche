@@ -29,6 +29,23 @@ const DEFAULT_DRIVE_FILE_NAME = 'codex_data.json';
 const TOMBSTONE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const CONFLICT_TIME_BUFFER_MS = 1000;
 const DEV_LOG_LIMIT = 200;
+const SAFE_NOOP = () => {};
+
+function resolveAppDependency(name, fallback = null) {
+  const dep = globalThis[name];
+  if (dep) return dep;
+  console.error(`[init] ${name} が見つかりません。script の読み込み順を確認してください。`);
+  return fallback;
+}
+
+const appUi = resolveAppDependency('appUi', {
+  setThinkingMode: SAFE_NOOP,
+  revealWithQuillEffect: async () => {},
+  addTransientDeleteButton: SAFE_NOOP,
+  isMobileInputMode: () => false,
+});
+const appApi = resolveAppDependency('appApi');
+const appSync = resolveAppDependency('appSync');
 
 
 function getErrorMessage(error, fallback = '不明なエラー') {
@@ -91,7 +108,11 @@ function installConsoleLogHook() {
   ['log', 'warn', 'error'].forEach((level) => {
     const original = console[level].bind(console);
     console[level] = (...args) => {
-      appendDevLog(level.toUpperCase(), args);
+      try {
+        appendDevLog(level.toUpperCase(), args);
+      } catch (e) {
+        original('[devlog-fallback] appendDevLog failed:', e);
+      }
       original(...args);
     };
   });
@@ -100,7 +121,7 @@ function installConsoleLogHook() {
 let driveSync = null;
 
 
-async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); driveSync.setLocalUpdatedAt(); if (syncDrive && driveSync.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
+async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); if (driveSync) driveSync.setLocalUpdatedAt(); if (syncDrive && driveSync?.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
 
 // below mostly original
 function renderModelOptions() {
@@ -225,4 +246,8 @@ userInput.addEventListener('keydown', function (e) {
   }
 });
 window.addEventListener('DOMContentLoaded', async () => { ['provider','model','gemini-key','openai-key','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','settings-back-btn','dev-log-list'].forEach((id)=>{const key=id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());dom[key]=document.getElementById(id);}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
+  if (!appApi || !appSync) {
+    console.error('[init] 必須依存(appApi/appSync)が不足しているため初期化を中止します。');
+    return;
+  }
   driveSync = appSync.createDriveSync({ state, dom, STORAGE_KEYS, DEFAULT_DRIVE_FOLDER_NAME, DEFAULT_DRIVE_FILE_NAME, DRIVE_SCOPE, TOMBSTONE_RETENTION_MS, CONFLICT_TIME_BUFFER_MS, getErrorMessage, startNewSession, persistState, renderHistory, renderSessionList, renderPersonaTabs }); appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON }); if (!state.sessions.length) await startNewSession(); if (!state.activeSessionId) state.activeSessionId = state.sessions[0].id; updateModeButton(); applySettingsToUI(); bindSettings(); bindSettingsNavigation(); renderSettingsView(); renderHistory(); renderSessionList(); renderPersonaTabs(); renderSystemPresetPanel(); renderDevLogs(); try { await driveSync.init(); } catch { driveSync.setStatus('Drive: 初期化失敗'); } });
