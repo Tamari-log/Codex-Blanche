@@ -485,7 +485,7 @@ body { font-family: 'Noto Serif JP', serif; }
 
 .scroll-to-bottom-btn {
     position: absolute;
-    right: 1rem;
+    left: 50%;
     bottom: calc(env(safe-area-inset-bottom) + 6.2rem);
     width: 2.6rem;
     height: 2.6rem;
@@ -498,14 +498,14 @@ body { font-family: 'Noto Serif JP', serif; }
     box-shadow: 0 8px 20px rgba(64, 38, 15, 0.18);
     z-index: 45;
     opacity: 0;
-    transform: translateY(8px);
+    transform: translate(-50%, 8px);
     pointer-events: none;
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .scroll-to-bottom-btn.is-visible {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     pointer-events: auto;
 }
 
