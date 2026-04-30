@@ -146,6 +146,25 @@ let driveSync = null;
 
 let selectedConversationSourceFile = null;
 
+
+const SENSITIVE_CONVERSATION_KEYS = new Set([
+  'geminiKey',
+  'openaiKey',
+  'googleAccessToken',
+  'googleClientId',
+]);
+
+function sanitizeConversationJsonNode(node) {
+  if (Array.isArray(node)) return node.map((item) => sanitizeConversationJsonNode(item));
+  if (!node || typeof node !== 'object') return node;
+  const next = {};
+  Object.entries(node).forEach(([key, value]) => {
+    if (SENSITIVE_CONVERSATION_KEYS.has(key)) return;
+    next[key] = sanitizeConversationJsonNode(value);
+  });
+  return next;
+}
+
 function normalizeWorldName(rawName, fallback = 'default') {
   const text = String(rawName || '').trim();
   return text || fallback;
@@ -162,7 +181,18 @@ function extractConversationGroupsByWorld(data) {
     if (!session || !Array.isArray(session.messages)) return;
     const normalized = normalizeImportedSession(session, ensureWorld(worldName).length);
     if (normalized.messages.length === 0) return;
-    ensureWorld(worldName).push({ id: normalized.id, title: normalized.title, messages: normalized.messages });
+    const safeWorld = normalizeWorldName(worldName);
+    const safeSession = sanitizeConversationJsonNode({
+      worldSetting: safeWorld,
+      id: normalized.id,
+      title: normalized.title,
+      messages: normalized.messages,
+      persona: session?.persona || session?.character || null,
+      model: session?.model || session?.modelName || session?.settings?.model || null,
+      temperature: session?.temperature ?? session?.settings?.temperature ?? null,
+      context: session?.context || session?.contextSettings || session?.settings?.context || null,
+    });
+    ensureWorld(worldName).push(safeSession);
   };
 
   if (Array.isArray(data)) {
@@ -218,7 +248,7 @@ async function runConversationJsonExtraction() {
     const groups = extractConversationGroupsByWorld(parsed);
     const worldCount = Object.keys(groups).length;
     if (!worldCount) throw new Error('会話形式JSONを検出できませんでした。');
-    const output = { exportedAt: new Date().toISOString(), sourceFileName: selectedConversationSourceFile.name, worlds: groups };
+    const output = sanitizeConversationJsonNode({ exportedAt: new Date().toISOString(), sourceFileName: selectedConversationSourceFile.name, worlds: groups });
     downloadJsonFile(`conversation_by_world_${Date.now()}.json`, output);
     if (dom.conversationJsonStatus) dom.conversationJsonStatus.textContent = `${worldCount}件の世界設定を抽出して保存しました。`;
   } catch (error) {
@@ -269,7 +299,7 @@ const getActiveSession=()=>state.sessions.find((s)=>s.id===state.activeSessionId
 function normalizeImportedSession(raw,index){const id=typeof raw.id==='string'&&raw.id?raw.id:crypto.randomUUID();const title=typeof raw.title==='string'&&raw.title.trim()?raw.title.trim():`インポート会話 ${index+1}`;const messages=Array.isArray(raw.messages)?raw.messages.filter((m)=>m&&(m.role==='user'||m.role==='ai')&&typeof m.text==='string').map((m)=>({role:m.role,text:m.text})):[];return {id,title,messages,pinned:Boolean(raw.pinned)};}
 function decodeChatPayloadFromJs(source=''){const text=source.trim();if(!text)return null;try{return JSON.parse(text);}catch{}const markerIndex=text.indexOf(CHAT_IMPORT_PREFIX);if(markerIndex<0)return null;const jsonText=text.slice(markerIndex+CHAT_IMPORT_PREFIX.length).trim();if(!jsonText)return null;try{return JSON.parse(jsonText);}catch{return null;}}
 async function importSessionsFromJsFile(){const input=dom.chatImportInput;if(!input)return;input.click();}
-async function handleChatImportInputChange(event){const file=event?.target?.files?.[0];if(!file)return;try{const source=await file.text();const parsed=decodeChatPayloadFromJs(source);if(!Array.isArray(parsed))throw new Error('配列形式の会話データが見つかりません。');const nextSessions=parsed.map((entry,index)=>normalizeImportedSession(entry,index)).filter((s)=>s.messages.length>0);if(!nextSessions.length)throw new Error('有効な会話データがありません。');const ok=window.confirm(`${nextSessions.length}件の会話を読み込みます。現在の会話履歴は上書きされます。よろしいですか？`);if(!ok)return;state.sessions=nextSessions;state.activeSessionId=nextSessions[0].id;await persistState();renderHistory();renderSessionList();renderPersonaTabs();closeSystemPresetPanel();}catch(e){window.alert(`読み込みに失敗しました: ${getErrorMessage(e)}`);}finally{event.target.value='';}}
+async function handleChatImportInputChange(event){const file=event?.target?.files?.[0];if(!file)return;try{const source=await file.text();const parsed=decodeChatPayloadFromJs(source);if(!Array.isArray(parsed))throw new Error('配列形式の会話データが見つかりません。');const nextSessions=parsed.map((entry,index)=>normalizeImportedSession(sanitizeConversationJsonNode(entry),index)).filter((s)=>s.messages.length>0);if(!nextSessions.length)throw new Error('有効な会話データがありません。');const ok=window.confirm(`${nextSessions.length}件の会話を読み込みます。現在の会話履歴は上書きされます。よろしいですか？`);if(!ok)return;state.sessions=nextSessions;state.activeSessionId=nextSessions[0].id;await persistState();renderHistory();renderSessionList();renderPersonaTabs();closeSystemPresetPanel();}catch(e){window.alert(`読み込みに失敗しました: ${getErrorMessage(e)}`);}finally{event.target.value='';}}
 function injectSelectedFileToInput(file,kind){if(!file||!userInput)return;const prefix=kind==='image'?'[画像添付]':'[ファイル添付]';const nextLine=`${prefix} ${file.name}`;userInput.value=[userInput.value.trim(),nextLine].filter(Boolean).join('\n');userInput.dispatchEvent(new Event('input'));userInput.focus();}
 function closeAllItemMenus(){document.querySelectorAll('.item-menu.is-open').forEach((menu)=>menu.classList.remove('is-open'));}
 async function startNewSession({ systemPrompt = '', activePersonaId = null } = {}){const id=crypto.randomUUID();state.settings.systemPrompt=systemPrompt;state.ui.activePersonaId=activePersonaId;saveSettings();state.sessions.unshift({id,title:`会話 ${new Date().toLocaleString('ja-JP')}`,messages:[]});state.activeSessionId=id;await persistState();renderHistory();renderSessionList();renderPersonaTabs();}
