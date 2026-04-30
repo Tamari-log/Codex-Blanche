@@ -130,6 +130,31 @@ body { font-family: 'Noto Serif JP', serif; }
     transition: transform 0.15s ease, background 0.2s ease;
 }
 
+.attach-menu-btn {
+    border: 1px solid rgba(184, 157, 116, 0.8);
+    border-radius: 9999px;
+    width: 2.55rem;
+    height: 2.55rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.45rem;
+    line-height: 1;
+    background: rgba(255, 255, 255, 0.55);
+    color: #40260f;
+    transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.attach-menu-btn:active {
+    transform: scale(0.94);
+}
+
+.dark .attach-menu-btn {
+    border-color: #475569;
+    background: rgba(30, 41, 59, 0.8);
+    color: #f8fafc;
+}
+
 .emoji-icon-btn:active {
     transform: scale(0.94);
 }
