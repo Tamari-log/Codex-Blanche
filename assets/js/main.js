@@ -144,6 +144,89 @@ function installConsoleLogHook() {
 
 let driveSync = null;
 
+let selectedConversationSourceFile = null;
+
+function normalizeWorldName(rawName, fallback = 'default') {
+  const text = String(rawName || '').trim();
+  return text || fallback;
+}
+
+function extractConversationGroupsByWorld(data) {
+  const groups = {};
+  const ensureWorld = (worldName) => {
+    const key = normalizeWorldName(worldName);
+    if (!groups[key]) groups[key] = [];
+    return groups[key];
+  };
+  const pushSession = (worldName, session) => {
+    if (!session || !Array.isArray(session.messages)) return;
+    const normalized = normalizeImportedSession(session, ensureWorld(worldName).length);
+    if (normalized.messages.length === 0) return;
+    ensureWorld(worldName).push({ id: normalized.id, title: normalized.title, messages: normalized.messages });
+  };
+
+  if (Array.isArray(data)) {
+    data.forEach((session, index) => pushSession(`world-${index + 1}`, session));
+  }
+
+  if (Array.isArray(data?.sessions)) {
+    data.sessions.forEach((session) => {
+      const worldName = session?.worldSetting || session?.world || session?.settings?.world || session?.meta?.world || 'default';
+      pushSession(worldName, session);
+    });
+  }
+
+  if (Array.isArray(data?.worlds)) {
+    data.worlds.forEach((world, worldIndex) => {
+      const worldName = world?.name || world?.id || `world-${worldIndex + 1}`;
+      const candidates = Array.isArray(world?.sessions) ? world.sessions : Array.isArray(world?.conversations) ? world.conversations : [];
+      candidates.forEach((session) => pushSession(worldName, session));
+    });
+  }
+
+  Object.keys(groups).forEach((key) => { if (!groups[key].length) delete groups[key]; });
+  return groups;
+}
+
+function downloadJsonFile(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function handleConversationJsonPick() {
+  dom.conversationJsonInput?.click();
+}
+
+async function handleConversationJsonInputChange(event) {
+  selectedConversationSourceFile = event?.target?.files?.[0] || null;
+  if (dom.conversationJsonStatus) dom.conversationJsonStatus.textContent = selectedConversationSourceFile ? `選択中: ${selectedConversationSourceFile.name}` : '未選択';
+}
+
+async function runConversationJsonExtraction() {
+  if (!selectedConversationSourceFile) {
+    window.alert('先にJSONファイルを選択してください。');
+    return;
+  }
+  try {
+    const sourceText = await selectedConversationSourceFile.text();
+    const parsed = JSON.parse(sourceText);
+    const groups = extractConversationGroupsByWorld(parsed);
+    const worldCount = Object.keys(groups).length;
+    if (!worldCount) throw new Error('会話形式JSONを検出できませんでした。');
+    const output = { exportedAt: new Date().toISOString(), sourceFileName: selectedConversationSourceFile.name, worlds: groups };
+    downloadJsonFile(`conversation_by_world_${Date.now()}.json`, output);
+    if (dom.conversationJsonStatus) dom.conversationJsonStatus.textContent = `${worldCount}件の世界設定を抽出して保存しました。`;
+  } catch (error) {
+    const message = `抽出失敗: ${getErrorMessage(error)}`;
+    if (dom.conversationJsonStatus) dom.conversationJsonStatus.textContent = message;
+    window.alert(message);
+  }
+}
 
 async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); if (driveSync) driveSync.setLocalUpdatedAt(); if (syncDrive && driveSync?.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
 
@@ -317,7 +400,7 @@ userInput.addEventListener('keydown', function (e) {
     handleSend();
   }
 });
-window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, appDom?.createDomRegistry ? appDom.createDomRegistry(['provider','model','gemini-key','openai-key','remember-api-keys','remember-google-login','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','chat-header','scroll-to-bottom-btn','settings-back-btn','dev-log-list','attach-menu-btn','image-upload-input','file-upload-input','chat-import-input']) : {}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
+window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, appDom?.createDomRegistry ? appDom.createDomRegistry(['provider','model','gemini-key','openai-key','remember-api-keys','remember-google-login','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','chat-header','scroll-to-bottom-btn','settings-back-btn','dev-log-list','attach-menu-btn','image-upload-input','file-upload-input','chat-import-input','conversation-json-input','conversation-json-pick-btn','conversation-json-run-btn','conversation-json-status']) : {}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
   document.addEventListener('visibilitychange', handleVisibilityDuringGeneration);
   dom.chatHeader?.addEventListener('click', (e) => {
     if (e.target.closest('button')) return;
@@ -328,6 +411,9 @@ window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, app
   dom.imageUploadInput?.addEventListener('change',(e)=>injectSelectedFileToInput(e?.target?.files?.[0],'image'));
   dom.fileUploadInput?.addEventListener('change',(e)=>injectSelectedFileToInput(e?.target?.files?.[0],'file'));
   dom.chatImportInput?.addEventListener('change',handleChatImportInputChange);
+  dom.conversationJsonPickBtn?.addEventListener('click', handleConversationJsonPick);
+  dom.conversationJsonInput?.addEventListener('change', handleConversationJsonInputChange);
+  dom.conversationJsonRunBtn?.addEventListener('click', runConversationJsonExtraction);
   chatArea?.addEventListener('scroll', updateScrollToBottomButtonVisibility);
   if (!appApi || !appSync) {
     console.error('[init] 必須依存(appApi/appSync)が不足しているため初期化を中止します。');

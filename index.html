@@ -153,6 +153,16 @@
 
                     <div id="view-dev-root" class="settings-view hidden space-y-3" data-view-title="開発者向け">
                         <button class="settings-nav-card" data-settings-view="view-dev-logs">ログ</button>
+                        <button class="settings-nav-card" data-settings-view="view-dev-conversation-export">会話JSON取り出し</button>
+                    </div>
+
+                    <div id="view-dev-conversation-export" class="settings-view hidden space-y-3" data-view-title="会話JSON取り出し">
+                        <h3 class="settings-view-title">会話JSON取り出し</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-300">Googleクラウド等から取得した履歴JSONを選択し、会話形式JSONのみを世界設定ごとに抽出します。</p>
+                        <input id="conversation-json-input" type="file" accept=".json,application/json" class="hidden">
+                        <button id="conversation-json-pick-btn" class="w-full bg-slate-200 dark:bg-slate-700 dark:text-white py-2 rounded-lg settings-action-btn">ファイル選択</button>
+                        <button id="conversation-json-run-btn" class="w-full bg-indigo-600 text-white py-2 rounded-lg settings-action-btn">実行</button>
+                        <p id="conversation-json-status" class="text-xs text-slate-600 dark:text-slate-300">未実行</p>
                     </div>
 
                     <div id="view-dev-logs" class="settings-view hidden space-y-3" data-view-title="ログ">
