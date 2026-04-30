@@ -482,3 +482,36 @@ body { font-family: 'Noto Serif JP', serif; }
 .preset-search-input::placeholder {
     color: #94a3b8;
 }
+
+.scroll-to-bottom-btn {
+    position: absolute;
+    right: 1rem;
+    bottom: calc(env(safe-area-inset-bottom) + 6.2rem);
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(123, 79, 36, 0.5);
+    background: rgba(255, 255, 255, 0.9);
+    color: #40260f;
+    font-size: 1.2rem;
+    font-weight: 700;
+    box-shadow: 0 8px 20px rgba(64, 38, 15, 0.18);
+    z-index: 45;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.scroll-to-bottom-btn.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.dark .scroll-to-bottom-btn {
+    background: rgba(30, 41, 59, 0.92);
+    color: #f8fafc;
+    border-color: rgba(148, 163, 184, 0.6);
+    box-shadow: 0 8px 20px rgba(2, 6, 23, 0.45);
+}
