@@ -19,10 +19,12 @@ const STORAGE_KEYS = {
   userSignature: 'user_signature',
   localUpdatedAt: 'codex_local_updated_at',
   lastRemoteModifiedAt: 'codex_last_remote_modified_at',
+  deletedAt: 'codex_deleted_at',
 };
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FOLDER_NAME = 'CodexBlanche';
 const DRIVE_FILE_NAME = 'codex_data.json';
+const TOMBSTONE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 
 function getErrorMessage(error, fallback = '不明なエラー') {
@@ -130,21 +132,31 @@ const driveSync = {
     const fileList = await gapi.client.drive.files.list({ q: fileQ, fields: 'files(id,name,modifiedTime)' });
     this.fileId = fileList.result.files?.[0]?.id || null;
   },
-  payload() { return { sessions: state.sessions, personas: state.personas }; },
+  payload() { return { sessions: state.sessions, personas: state.personas, deletedAt: this.getDeletedAt() || null }; },
   getLocalUpdatedAt() { return Number(localStorage.getItem(STORAGE_KEYS.localUpdatedAt) || 0); },
   setLocalUpdatedAt(timestamp = Date.now()) { localStorage.setItem(STORAGE_KEYS.localUpdatedAt, String(timestamp)); },
   getLastRemoteModifiedAt() { return Date.parse(localStorage.getItem(STORAGE_KEYS.lastRemoteModifiedAt) || '') || 0; },
   setLastRemoteModifiedAt(isoTime = '') { if (isoTime) localStorage.setItem(STORAGE_KEYS.lastRemoteModifiedAt, isoTime); },
+  getDeletedAt() { return Number(localStorage.getItem(STORAGE_KEYS.deletedAt) || 0); },
+  setDeletedAt(timestamp = 0) {
+    if (timestamp > 0) localStorage.setItem(STORAGE_KEYS.deletedAt, String(timestamp));
+    else localStorage.removeItem(STORAGE_KEYS.deletedAt);
+  },
+  shouldKeepTombstone(timestamp = this.getDeletedAt(), now = Date.now()) {
+    return timestamp > 0 && now - timestamp <= TOMBSTONE_RETENTION_MS;
+  },
   hasSyncData() {
     const hasPersonas = state.personas.length > 0 || state.hiddenSystemPersonaIds.length > 0;
     const hasMessages = state.sessions.some((session) => (session.messages?.length || 0) > 0);
     return hasPersonas || hasMessages;
   },
   async _deleteRemoteFileInternal() {
-    if (!this.fileId) return;
-    await gapi.client.drive.files.delete({ fileId: this.fileId });
-    this.fileId = null;
-    this.setStatus(`Drive: ファイル削除済み ${new Date().toLocaleTimeString('ja-JP')}`);
+    const deletedAt = Date.now();
+    this.setDeletedAt(deletedAt);
+    state.sessions = [];
+    state.personas = [];
+    await this._pushInternal();
+    this.setStatus(`Drive: 削除マーク同期済み ${new Date().toLocaleTimeString('ja-JP')}`);
   },
   async deleteRemoteFile() {
     return this.enqueue(async () => {
@@ -153,9 +165,11 @@ const driveSync = {
     });
   },
   async _pushInternal() {
-    if (!this.hasSyncData()) {
-      await this._deleteRemoteFileInternal();
-      return;
+    const hasData = this.hasSyncData();
+    if (hasData) this.setDeletedAt(0);
+    const deletedAt = this.getDeletedAt();
+    if (!hasData && !this.shouldKeepTombstone(deletedAt)) {
+      this.setDeletedAt(Date.now());
     }
     const meta = this.fileId
       ? { name: DRIVE_FILE_NAME, mimeType: 'application/json' }
@@ -190,9 +204,24 @@ const driveSync = {
         return;
       }
       const r = await gapi.client.drive.files.get({ fileId: this.fileId, alt: 'media' });
-      if (r.result?.sessions) state.sessions = r.result.sessions;
-      if (r.result?.personas) state.personas = r.result.personas;
-      if (!state.sessions.length) startNewSession();
+      const remoteDeletedAt = Number(r.result?.deletedAt || 0);
+      if (remoteDeletedAt > 0 && this.shouldKeepTombstone(remoteDeletedAt)) {
+        if (localUpdatedAt <= remoteDeletedAt) {
+          this.setDeletedAt(remoteDeletedAt);
+          state.sessions = [];
+          state.personas = [];
+          if (!state.sessions.length) await startNewSession();
+          await persistState({ syncDrive: false });
+          if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
+          renderHistory(); renderSessionList(); renderPersonaTabs();
+          this.setStatus(`Drive: 削除マークを適用 ${new Date().toLocaleTimeString('ja-JP')}`);
+          return;
+        }
+      }
+      if (Array.isArray(r.result?.sessions)) state.sessions = r.result.sessions;
+      if (Array.isArray(r.result?.personas)) state.personas = r.result.personas;
+      this.setDeletedAt(0);
+      if (!state.sessions.length) await startNewSession();
       if (!state.activeSessionId || !state.sessions.find((s) => s.id === state.activeSessionId)) state.activeSessionId = state.sessions[0]?.id || null;
       await persistState({ syncDrive: false });
       if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
