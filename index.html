@@ -110,6 +110,7 @@
                         <button class="settings-nav-card" data-settings-view="view-ai-context">コンテキスト / 署名設定画面</button>
                         <input id="persona-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="保存するプリセット名">
                         <button onclick="savePersona()" class="w-full bg-indigo-600 text-white py-2 rounded-lg settings-action-btn">プリセット保存</button>
+                        <button onclick="applySystemPromptToCurrentConversation()" class="w-full bg-violet-600 text-white py-2 rounded-lg settings-action-btn">現在の会話に適用</button>
                     </div>
 
                     <div id="view-ai-model" class="settings-view hidden space-y-3" data-view-title="モデル / APIキー設定画面">
