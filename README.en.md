@@ -183,3 +183,8 @@ Feel free to fork, modify, or translate.
 ## Why this exists
 
 Because I needed it.
+
+---
+
+## Terms / Privacy
+See `/terms.html` and `/privacy.html`
