@@ -73,6 +73,7 @@ const MOBILE_MEDIA_QUERY = '(max-width: 768px), (pointer: coarse)';
 const SEND_BUTTON_DEFAULT_ICON = '🖋️';
 const SEND_BUTTON_STOP_ICON = '⏹️';
 const SCROLL_BOTTOM_THRESHOLD_PX = 32;
+const BACKGROUND_WARNING_TEXT = '※ バックグラウンド中はOS制限で処理が中断される場合があります。';
 let historySearchKeyword = '';
 const SYSTEM_PERSONAS = [{ id: 'sys-neutral', name: '標準', settings: { systemPrompt: '' } }, { id: 'sys-creative', name: '創作補助', settings: { temperature: 1.0, systemPrompt: 'あなたは創作支援に強いアシスタントです。複数案を提示し、改善点を具体的に示してください。' } }, { id: 'sys-concise', name: '簡潔回答', settings: { temperature: 0.3, systemPrompt: '要点を短く、箇条書き中心で回答してください。' } }];
 const MODEL_OPTIONS = { gemini: [{ value: 'gemini-3-flash-preview', label: 'gemini 3 flash（高速）' }, { value: 'gemini-3.1-flash-lite-preview', label: 'gemini 3.1 flash lite（新しい高速）' }, { value: 'gemini-3.1-pro-preview', label: 'gemini 3.1 pro（高性能）' }], openai: [{ value: 'gpt-4.1-mini', label: 'gpt-4.1-mini（高速）' }, { value: 'gpt-4.1', label: 'gpt-4.1（高性能）' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini（軽量）' }] };
@@ -201,8 +202,38 @@ function bindSettings(){const {provider,model,geminiKey,openaiKey,rememberApiKey
 function closeSystemPresetPanel(){state.ui.showSystemPresetPanel=false;renderSystemPresetPanel();}
 function renderSystemPresetPanel(){const p=document.getElementById('system-preset-panel');const t=document.getElementById('system-preset-toggle');const b=document.getElementById('system-preset-backdrop');p.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.classList.toggle('is-open',state.ui.showSystemPresetPanel);b?.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.setAttribute('aria-expanded',state.ui.showSystemPresetPanel?'true':'false');}
 let currentRequestController = null;
+let wakeLockSentinel = null;
 
-async function handleSend(){if(currentRequestController){currentRequestController.abort();return;}const text=userInput.value.trim();if(!text)return;const s=getActiveSession();if(!s)return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const controller=new AbortController();currentRequestController=controller;appUi.setThinkingMode(dom.sendBtn, true, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });s.messages.push({role:'user',text});await persistState();renderHistory();userInput.value='';userInput.dispatchEvent(new Event('input'));const loading=addBubble('思索中...','ai');try{const reply=await appApi.generateAssistantReply({ provider: state.settings.provider, messages: [...s.messages], apiKey, settings: state.settings, signal: controller.signal });s.messages.push({role:'ai',text:reply});await persistState();await appUi.revealWithQuillEffect(chatArea, loading.div, reply);renderHistory();}catch(e){if(e?.name==='AbortError'){loading.div.innerText='生成を中断しました。';}else{loading.div.innerText=`エラー：${e.message||e}`;}appUi.addTransientDeleteButton(loading.wrap);}finally{currentRequestController=null;appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });userInput.focus();}}
+async function requestWakeLockIfAvailable() {
+  if (!('wakeLock' in navigator)) return false;
+  try {
+    wakeLockSentinel = await navigator.wakeLock.request('screen');
+    wakeLockSentinel?.addEventListener?.('release', () => {
+      wakeLockSentinel = null;
+    });
+    return true;
+  } catch (e) {
+    console.warn('[wakelock] 取得に失敗しました。', e);
+    return false;
+  }
+}
+
+function releaseWakeLock() {
+  if (!wakeLockSentinel) return;
+  wakeLockSentinel.release().catch(()=>{});
+  wakeLockSentinel = null;
+}
+
+function handleVisibilityDuringGeneration() {
+  if (!currentRequestController) return;
+  if (document.hidden) {
+    console.warn(BACKGROUND_WARNING_TEXT);
+    return;
+  }
+  requestWakeLockIfAvailable();
+}
+
+async function handleSend(){if(currentRequestController){currentRequestController.abort();return;}const text=userInput.value.trim();if(!text)return;const s=getActiveSession();if(!s)return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const controller=new AbortController();currentRequestController=controller;await requestWakeLockIfAvailable();appUi.setThinkingMode(dom.sendBtn, true, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });s.messages.push({role:'user',text});await persistState();renderHistory();userInput.value='';userInput.dispatchEvent(new Event('input'));const loading=addBubble(`思索中...\n${BACKGROUND_WARNING_TEXT}`,'ai');try{const reply=await appApi.generateAssistantReply({ provider: state.settings.provider, messages: [...s.messages], apiKey, settings: state.settings, signal: controller.signal });s.messages.push({role:'ai',text:reply});await persistState();await appUi.revealWithQuillEffect(chatArea, loading.div, reply);renderHistory();}catch(e){if(e?.name==='AbortError'){loading.div.innerText='生成を中断しました。';}else{loading.div.innerText=`エラー：${e.message||e}`;}appUi.addTransientDeleteButton(loading.wrap);}finally{currentRequestController=null;releaseWakeLock();appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });userInput.focus();}}
 async function deleteMessage(index){const s=getActiveSession();if(!s?.messages[index])return;s.messages.splice(index,1);await persistState();renderHistory();}
 async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[index])return;const target=s.messages[index];if(target.role!=='user'&&target.role!=='ai')return;const apiKey=state.settings.provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const context=target.role==='user'?s.messages.slice(0,index+1):s.messages.slice(0,index);s.messages=context;await persistState();renderHistory();const loading=addBubble('思索中...','ai');try{const reply=await appApi.generateAssistantReply({ provider: state.settings.provider, messages: context, apiKey, settings: state.settings });s.messages.push({role:'ai',text:reply});await persistState();await appUi.revealWithQuillEffect(chatArea, loading.div, reply);renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;appUi.addTransientDeleteButton(loading.wrap);}}
 async function deleteSessionById(sessionId){const target=state.sessions.find((x)=>x.id===sessionId);if(!target)return;const confirmed=window.confirm(`会話「${target.title}」を削除しますか？\nこの操作は取り消せません。`);if(!confirmed)return;state.sessions=state.sessions.filter((x)=>x.id!==target.id);if(state.sessions.length===0){await startNewSession();return;}if(state.activeSessionId===target.id)state.activeSessionId=state.sessions[0].id;renderHistory();renderSessionList();renderPersonaTabs();await persistState();}
@@ -269,6 +300,7 @@ userInput.addEventListener('keydown', function (e) {
   }
 });
 window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, appDom?.createDomRegistry ? appDom.createDomRegistry(['provider','model','gemini-key','openai-key','remember-api-keys','remember-google-login','google-client-id','drive-folder-name','drive-file-name','system-prompt','user-signature','temperature','max-tokens','temperature-value','max-tokens-value','clear-system-prompt-btn','system-preset-toggle','mode-toggle-btn','google-login-btn','google-logout-btn','drive-status','send-btn','settings-title','chat-header','scroll-to-bottom-btn','settings-back-btn','dev-log-list']) : {}); const presetBackdrop=document.getElementById('system-preset-backdrop');presetBackdrop?.addEventListener('click',closeSystemPresetPanel);document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&state.ui.showSystemPresetPanel)closeSystemPresetPanel();}); installConsoleLogHook();
+  document.addEventListener('visibilitychange', handleVisibilityDuringGeneration);
   dom.chatHeader?.addEventListener('click', (e) => {
     if (e.target.closest('button')) return;
     scrollChatToTop();
