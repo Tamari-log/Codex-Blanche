@@ -75,14 +75,16 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
 }
 
 async function callOpenAIAPI(messages, apiKey, options = {}) {
-  const model = options.model || 'gpt-4.1-mini';
+  const model = options.model || 'gpt-5.3';
+  const instructions = messages.find((m) => m.role === 'system')?.text || '';
+  const input = messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({
+      role: m.role === 'ai' ? 'assistant' : m.role,
+      content: [{ type: 'input_text', text: m.text }],
+    }));
 
-  const formattedMessages = messages.map((m) => ({
-    role: m.role === 'ai' ? 'assistant' : m.role,
-    content: m.text,
-  }));
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     signal: options.signal,
     headers: {
@@ -91,9 +93,10 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
     },
     body: JSON.stringify({
       model,
-      messages: formattedMessages,
+      input,
+      instructions: instructions || undefined,
       temperature: options.temperature,
-      max_tokens: options.maxTokens,
+      max_output_tokens: options.maxTokens,
     }),
   });
 
@@ -108,5 +111,5 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
     throw new Error(`OpenAI API request failed (${response.status}): ${detail}`);
   }
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || '応答を取得できませんでした。';
+  return data.output_text || '応答を取得できませんでした。';
 }
