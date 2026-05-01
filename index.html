@@ -81,7 +81,7 @@
                 <div class="settings-screen-body">
                     <div id="settings-view-root" class="settings-view space-y-3" data-view-title="設定">
                         <button class="settings-nav-card" data-settings-view="view-account">アカウント / 連携</button>
-                        <button class="settings-nav-card" data-settings-view="view-ai-root">AI設定</button>
+                        <button class="settings-nav-card" data-settings-view="view-ai-root">カスタムプリセット作成</button>
                         <button class="settings-nav-card" data-settings-view="view-display">表示設定</button>
                         <button class="settings-nav-card" data-settings-view="view-advanced-root">詳細設定</button>
                         <button onclick="startNewSession({ systemPrompt: '', activePersonaId: null }).then(()=>toggleSettings())" class="settings-nav-card">新しい会話を開始</button>
@@ -111,8 +111,8 @@
                         <p id="drive-status" class="text-xs text-slate-600 dark:text-slate-300">Drive: 未接続</p>
                     </div>
 
-                    <div id="view-ai-root" class="settings-view hidden space-y-3" data-view-title="AI設定">
-                        <button class="settings-nav-card" data-settings-view="view-ai-model">モデル / APIキー設定画面</button>
+                    <div id="view-ai-root" class="settings-view hidden space-y-3" data-view-title="カスタムプリセット作成">
+                        <button class="settings-nav-card" data-settings-view="view-ai-model">モデル設定</button>
                         <button class="settings-nav-card" data-settings-view="view-ai-behavior">振る舞い（プロンプト・温度）設定画面</button>
                         <button class="settings-nav-card" data-settings-view="view-ai-context">コンテキスト / 署名設定画面</button>
                         <input id="persona-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="保存するプリセット名">
@@ -120,8 +120,8 @@
                         
                     </div>
 
-                    <div id="view-ai-model" class="settings-view hidden space-y-3" data-view-title="モデル / APIキー設定画面">
-                        <h3 class="settings-view-title">モデル / APIキー</h3>
+                    <div id="view-ai-model" class="settings-view hidden space-y-3" data-view-title="モデル設定">
+                        <h3 class="settings-view-title">モデル設定</h3>
                         <select id="provider" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white">
                             <option value="gemini">Gemini</option>
                             <option value="openai">ChatGPT (OpenAI)</option>
