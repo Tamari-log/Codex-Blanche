@@ -65,7 +65,47 @@ function readJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 }
 
-const initialState = { sessions: readJSON(STORAGE_KEYS.sessions, []), activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId), personas: readJSON(STORAGE_KEYS.personas, []), hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []), settings: { provider: localStorage.getItem(STORAGE_KEYS.provider) || 'gemini', geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || 'gemini-3.1-pro-preview', openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || 'gpt-4.1-mini', geminiKey: sessionStorage.getItem(STORAGE_KEYS.geminiKey) || localStorage.getItem(STORAGE_KEYS.geminiKey) || '', openaiKey: sessionStorage.getItem(STORAGE_KEYS.openaiKey) || localStorage.getItem(STORAGE_KEYS.openaiKey) || '', googleClientId: localStorage.getItem(STORAGE_KEYS.googleClientId) || '', driveFolderName: localStorage.getItem(STORAGE_KEYS.driveFolderName) || DEFAULT_DRIVE_FOLDER_NAME, driveFileName: localStorage.getItem(STORAGE_KEYS.driveFileName) || DEFAULT_DRIVE_FILE_NAME, systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '', userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || 'Blanche', temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || 0.7), maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || 2048), rememberApiKeys: localStorage.getItem(STORAGE_KEYS.rememberApiKeys) === 'true', rememberGoogleLogin: localStorage.getItem(STORAGE_KEYS.rememberGoogleLogin) === 'true' }, ui: { showSystemPresetPanel: false, activePersonaId: null }, devLogs: [] };
+const DEFAULT_SETTINGS = {
+  provider: 'gemini',
+  geminiModel: 'gemini-3.1-pro-preview',
+  openaiModel: 'gpt-4.1-mini',
+  userSignature: 'Blanche',
+  temperature: 0.7,
+  maxTokens: 2048,
+};
+
+function createInitialSettings() {
+  return {
+    provider: localStorage.getItem(STORAGE_KEYS.provider) || DEFAULT_SETTINGS.provider,
+    geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || DEFAULT_SETTINGS.geminiModel,
+    openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || DEFAULT_SETTINGS.openaiModel,
+    geminiKey: sessionStorage.getItem(STORAGE_KEYS.geminiKey) || localStorage.getItem(STORAGE_KEYS.geminiKey) || '',
+    openaiKey: sessionStorage.getItem(STORAGE_KEYS.openaiKey) || localStorage.getItem(STORAGE_KEYS.openaiKey) || '',
+    googleClientId: localStorage.getItem(STORAGE_KEYS.googleClientId) || '',
+    driveFolderName: localStorage.getItem(STORAGE_KEYS.driveFolderName) || DEFAULT_DRIVE_FOLDER_NAME,
+    driveFileName: localStorage.getItem(STORAGE_KEYS.driveFileName) || DEFAULT_DRIVE_FILE_NAME,
+    systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '',
+    userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || DEFAULT_SETTINGS.userSignature,
+    temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || DEFAULT_SETTINGS.temperature),
+    maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || DEFAULT_SETTINGS.maxTokens),
+    rememberApiKeys: localStorage.getItem(STORAGE_KEYS.rememberApiKeys) === 'true',
+    rememberGoogleLogin: localStorage.getItem(STORAGE_KEYS.rememberGoogleLogin) === 'true',
+  };
+}
+
+function createInitialState() {
+  return {
+    sessions: readJSON(STORAGE_KEYS.sessions, []),
+    activeSessionId: localStorage.getItem(STORAGE_KEYS.activeSessionId),
+    personas: readJSON(STORAGE_KEYS.personas, []),
+    hiddenSystemPersonaIds: readJSON(STORAGE_KEYS.hiddenSystemPersonaIds, []),
+    settings: createInitialSettings(),
+    ui: { showSystemPresetPanel: false, activePersonaId: null },
+    devLogs: [],
+  };
+}
+
+const initialState = createInitialState();
 const stateStore = appState?.createStore ? appState.createStore(initialState) : { getState: () => initialState };
 const state = stateStore.getState();
 const CONTEXT_LIMITS = { gemini: 15000, openai: 5000 };
