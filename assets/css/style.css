@@ -330,18 +330,6 @@ body { font-family: 'Noto Serif JP', serif; }
     padding: 0.2rem 0.6rem 0.7rem;
 }
 
-.persona-tab-btn {
-    color: #40260f;
-    border-color: rgba(184, 157, 116, 0.8);
-    background: rgba(255, 255, 255, 0.45);
-}
-
-.dark .persona-tab-btn {
-    color: #e2e8f0;
-    border-color: rgba(148, 163, 184, 0.55);
-    background: rgba(30, 41, 59, 0.72);
-}
-
 .persona-row {
     width: 100%;
     display: flex;

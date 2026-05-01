@@ -2,29 +2,8 @@ const chatArea = document.getElementById('chat-area');
 const userInput = document.getElementById('user-input');
 const dom = {};
 
-const STORAGE_KEYS = {
-  sessions: 'codex_sessions',
-  activeSessionId: 'codex_active_session_id',
-  personas: 'codex_personas',
-  hiddenSystemPersonaIds: 'codex_hidden_system_persona_ids',
-  provider: 'provider',
-  geminiModel: 'gemini_model',
-  openaiModel: 'openai_model',
-  geminiKey: 'gemini_api_key',
-  openaiKey: 'openai_api_key',
-  rememberApiKeys: 'remember_api_keys',
-  rememberGoogleLogin: 'remember_google_login',
-  googleClientId: 'google_client_id',
-  driveFolderName: 'drive_folder_name',
-  driveFileName: 'drive_file_name',
-  systemPrompt: 'system_prompt',
-  temperature: 'temperature',
-  maxTokens: 'max_tokens',
-  userSignature: 'user_signature',
-  localUpdatedAt: 'codex_local_updated_at',
-  lastRemoteModifiedAt: 'codex_last_remote_modified_at',
-  deletedAt: 'codex_deleted_at',
-};
+const STORAGE_KEYS = window.appSettings?.STORAGE_KEYS || {};
+
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DEFAULT_DRIVE_FOLDER_NAME = 'CodexBlanche';
 const DEFAULT_DRIVE_FILE_NAME = 'codex_data.json';
@@ -65,33 +44,8 @@ function readJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 }
 
-const DEFAULT_SETTINGS = {
-  provider: 'gemini',
-  geminiModel: 'gemini-3.1-pro-preview',
-  openaiModel: 'gpt-4.1-mini',
-  userSignature: 'Blanche',
-  temperature: 0.7,
-  maxTokens: 2048,
-};
-
-function createInitialSettings() {
-  return {
-    provider: localStorage.getItem(STORAGE_KEYS.provider) || DEFAULT_SETTINGS.provider,
-    geminiModel: localStorage.getItem(STORAGE_KEYS.geminiModel) || DEFAULT_SETTINGS.geminiModel,
-    openaiModel: localStorage.getItem(STORAGE_KEYS.openaiModel) || DEFAULT_SETTINGS.openaiModel,
-    geminiKey: sessionStorage.getItem(STORAGE_KEYS.geminiKey) || localStorage.getItem(STORAGE_KEYS.geminiKey) || '',
-    openaiKey: sessionStorage.getItem(STORAGE_KEYS.openaiKey) || localStorage.getItem(STORAGE_KEYS.openaiKey) || '',
-    googleClientId: localStorage.getItem(STORAGE_KEYS.googleClientId) || '',
-    driveFolderName: localStorage.getItem(STORAGE_KEYS.driveFolderName) || DEFAULT_DRIVE_FOLDER_NAME,
-    driveFileName: localStorage.getItem(STORAGE_KEYS.driveFileName) || DEFAULT_DRIVE_FILE_NAME,
-    systemPrompt: localStorage.getItem(STORAGE_KEYS.systemPrompt) || '',
-    userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || DEFAULT_SETTINGS.userSignature,
-    temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || DEFAULT_SETTINGS.temperature),
-    maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || DEFAULT_SETTINGS.maxTokens),
-    rememberApiKeys: localStorage.getItem(STORAGE_KEYS.rememberApiKeys) === 'true',
-    rememberGoogleLogin: localStorage.getItem(STORAGE_KEYS.rememberGoogleLogin) === 'true',
-  };
-}
+const DEFAULT_SETTINGS = window.appSettings?.DEFAULT_SETTINGS || {};
+const createInitialSettings = window.appSettings?.createInitialSettings || (() => ({}));
 
 function createInitialState() {
   return {
@@ -108,16 +62,16 @@ function createInitialState() {
 const initialState = createInitialState();
 const stateStore = appState?.createStore ? appState.createStore(initialState) : { getState: () => initialState };
 const state = stateStore.getState();
-const CONTEXT_LIMITS = { gemini: 15000, openai: 5000 };
+const CONTEXT_LIMITS = window.appSessions?.CONTEXT_LIMITS || { gemini: 15000, openai: 5000 };
 const MOBILE_MEDIA_QUERY = '(max-width: 768px), (pointer: coarse)';
 const SEND_BUTTON_DEFAULT_ICON = '🖋️';
 const SEND_BUTTON_STOP_ICON = '⏹️';
 const SCROLL_BOTTOM_THRESHOLD_PX = 32;
 const BACKGROUND_WARNING_TEXT = '※ バックグラウンド中はOS制限で処理が中断される場合があります。';
-const CHAT_IMPORT_PREFIX = '__CODEX_CHATS__';
+const CHAT_IMPORT_PREFIX = window.appImportExport?.CHAT_IMPORT_PREFIX || '__CODEX_CHATS__';
 let historySearchKeyword = '';
-const SYSTEM_PERSONAS = [{ id: 'sys-neutral', name: '標準', settings: { systemPrompt: '' } }, { id: 'sys-creative', name: '創作補助', settings: { temperature: 1.0, systemPrompt: 'あなたは創作支援に強いアシスタントです。複数案を提示し、改善点を具体的に示してください。' } }, { id: 'sys-concise', name: '簡潔回答', settings: { temperature: 0.3, systemPrompt: '要点を短く、箇条書き中心で回答してください。' } }];
-const MODEL_OPTIONS = { gemini: [{ value: 'gemini-3-flash-preview', label: 'gemini 3 flash（高速）' }, { value: 'gemini-3.1-flash-lite-preview', label: 'gemini 3.1 flash lite（新しい高速）' }, { value: 'gemini-3.1-pro-preview', label: 'gemini 3.1 pro（高性能）' }], openai: [{ value: 'gpt-4.1-mini', label: 'gpt-4.1-mini（高速）' }, { value: 'gpt-4.1', label: 'gpt-4.1（高性能）' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini（軽量）' }] };
+const SYSTEM_PERSONAS = window.appPersona?.SYSTEM_PERSONAS || [];
+const MODEL_OPTIONS = window.appSettings?.MODEL_OPTIONS || {};
 const settingsNav = { stack: ['settings-view-root'] };
 
 function scrollChatToTop() {
