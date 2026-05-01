@@ -89,6 +89,13 @@
                     </div>
 
                     <div id="view-account" class="settings-view hidden space-y-3" data-view-title="アカウント / 連携">
+                        <h3 class="settings-view-title">API連携</h3>
+                        <input type="password" id="gemini-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Gemini API Key">
+                        <input type="password" id="openai-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="OpenAI API Key">
+                        <label class="flex items-center gap-2 text-sm dark:text-white">
+                            <input type="checkbox" id="remember-api-keys" class="h-4 w-4">
+                            APIキーをこの端末に保存する（localStorage）
+                        </label>
                         <h3 class="settings-view-title">Google連携</h3>
                         <input id="google-client-id" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Google Client ID">
                         <input id="drive-folder-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Driveフォルダ名（既定: CodexBlanche）">
@@ -120,12 +127,6 @@
                             <option value="openai">ChatGPT (OpenAI)</option>
                         </select>
                         <select id="model" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white"></select>
-                        <input type="password" id="gemini-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="Gemini API Key">
-                        <input type="password" id="openai-key" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="OpenAI API Key">
-                        <label class="flex items-center gap-2 text-sm dark:text-white">
-                            <input type="checkbox" id="remember-api-keys" class="h-4 w-4">
-                            APIキーをこの端末に保存する（localStorage）
-                        </label>
                     </div>
 
                     <div id="view-ai-behavior" class="settings-view hidden space-y-3" data-view-title="振る舞い設定画面">
