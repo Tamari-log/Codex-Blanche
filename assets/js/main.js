@@ -65,7 +65,7 @@ function createInitialState() {
 const initialState = createInitialState();
 const stateStore = appState?.createStore ? appState.createStore(initialState) : { getState: () => initialState };
 const state = stateStore.getState();
-const CONTEXT_LIMITS = window.appSessions?.CONTEXT_LIMITS || { gemini: 15000, openai: 5000 };
+const CONTEXT_LIMITS = window.appSessions?.CONTEXT_LIMITS || window.appSettings?.CONTEXT_LIMITS || { gemini: 15000, openai: 5000 };
 const MOBILE_MEDIA_QUERY = '(max-width: 768px), (pointer: coarse)';
 const SEND_BUTTON_DEFAULT_ICON = '🖋️';
 const SEND_BUTTON_STOP_ICON = '⏹️';
