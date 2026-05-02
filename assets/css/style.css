@@ -605,3 +605,18 @@ body { font-family: 'Noto Serif JP', serif; }
     background: rgba(15, 23, 42, 0.45);
     color: #e2e8f0;
 }
+
+.ai-msg p { margin: 0.35rem 0; }
+.ai-msg h1, .ai-msg h2, .ai-msg h3 { font-weight: 700; line-height: 1.4; margin: 0.65rem 0 0.35rem; }
+.ai-msg h1 { font-size: 1.2rem; }
+.ai-msg h2 { font-size: 1.1rem; }
+.ai-msg h3 { font-size: 1rem; }
+.ai-msg ul { list-style: disc; margin: 0.4rem 0 0.4rem 1.3rem; padding: 0; }
+.ai-msg li { margin: 0.15rem 0; }
+.ai-msg code { background: rgba(51, 65, 85, 0.12); border-radius: 0.3rem; padding: 0.08rem 0.3rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.ai-msg pre { background: rgba(15, 23, 42, 0.08); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: 0.5rem; padding: 0.65rem; overflow-x: auto; }
+.ai-msg pre code { background: transparent; border-radius: 0; padding: 0; }
+.ai-msg a { color: #1d4ed8; text-decoration: underline; }
+.dark .ai-msg code { background: rgba(148, 163, 184, 0.22); }
+.dark .ai-msg pre { background: rgba(15, 23, 42, 0.75); border-color: rgba(148, 163, 184, 0.35); }
+.dark .ai-msg a { color: #93c5fd; }
