@@ -326,7 +326,38 @@ async function runConversationHistoryOnlyJsonExtraction() {
   }
 }
 
-async function persistState({ syncDrive = true } = {}) { localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(state.sessions)); localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas)); localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || ''); localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds)); if (driveSync) driveSync.setLocalUpdatedAt(); if (syncDrive && driveSync?.accessToken) { try { await driveSync.push(); } catch (e) { driveSync.setStatus(`Drive同期失敗: ${e.message}`); } } }
+function stripImageDataUrlForStorage(sessions = []) {
+  return sessions.map((session) => ({
+    ...session,
+    messages: Array.isArray(session?.messages)
+      ? session.messages.map((message) => {
+          if (!Array.isArray(message?.attachments) || !message.attachments.length) return message;
+          const attachments = message.attachments.map((attachment) => {
+            if (attachment?.type !== 'image') return attachment;
+            const { dataUrl, ...rest } = attachment;
+            return rest;
+          });
+          return { ...message, attachments };
+        })
+      : [],
+  }));
+}
+
+async function persistState({ syncDrive = true } = {}) {
+  const serializedSessions = stripImageDataUrlForStorage(state.sessions);
+  localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(serializedSessions));
+  localStorage.setItem(STORAGE_KEYS.personas, JSON.stringify(state.personas));
+  localStorage.setItem(STORAGE_KEYS.activeSessionId, state.activeSessionId || '');
+  localStorage.setItem(STORAGE_KEYS.hiddenSystemPersonaIds, JSON.stringify(state.hiddenSystemPersonaIds));
+  if (driveSync) driveSync.setLocalUpdatedAt();
+  if (syncDrive && driveSync?.accessToken) {
+    try {
+      await driveSync.push();
+    } catch (e) {
+      driveSync.setStatus(`Drive同期失敗: ${e.message}`);
+    }
+  }
+}
 
 // below mostly original
 function renderModelOptions() {
