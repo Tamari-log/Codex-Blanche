@@ -411,22 +411,42 @@ function readFileAsDataUrl(file) {
 
 function renderImagePreview() {
   const wrap = document.getElementById('image-preview-wrap');
-  const img = document.getElementById('image-preview');
-  const name = document.getElementById('image-preview-name');
-  if (!wrap || !img || !name) return;
+  const list = document.getElementById('image-preview-list');
+  if (!wrap || !list) return;
+
   if (!selectedImageAttachments.length) {
     wrap.classList.add('hidden');
-    img.removeAttribute('src');
-    name.textContent = '';
+    list.innerHTML = '';
     syncComposerGrowOffset();
     return;
   }
-  const [first] = selectedImageAttachments;
+
   wrap.classList.remove('hidden');
-  img.src = first.dataUrl;
-  name.textContent = selectedImageAttachments.length === 1
-    ? first.file.name
-    : `${first.file.name} ほか${selectedImageAttachments.length - 1}件`;
+  list.innerHTML = '';
+
+  selectedImageAttachments.forEach((attachment, index) => {
+    const item = document.createElement('div');
+    item.className = 'image-preview-item';
+
+    const img = document.createElement('img');
+    img.src = attachment.dataUrl;
+    img.alt = attachment.file?.name || `添付画像${index + 1}`;
+    img.className = 'image-preview-thumb';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'image-preview-remove-btn';
+    removeBtn.setAttribute('aria-label', `${attachment.file?.name || `添付画像${index + 1}`} を削除`);
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => {
+      selectedImageAttachments.splice(index, 1);
+      renderImagePreview();
+    });
+
+    item.append(img, removeBtn);
+    list.appendChild(item);
+  });
+
   syncComposerGrowOffset();
 }
 
@@ -555,7 +575,6 @@ window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, app
   dom.attachMenuBtn?.addEventListener('click',openAttachTypeSelector);
   dom.imageUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;try{const attachments=await Promise.all(files.map(async(file)=>({file,dataUrl:await readFileAsDataUrl(file),mimeType:file.type||'image/png'})));selectedImageAttachments=[...selectedImageAttachments,...attachments];renderImagePreview();}catch(err){window.alert(`画像の添付に失敗しました: ${getErrorMessage(err)}`);}finally{if(e?.target)e.target.value='';}});
   dom.fileUploadInput?.addEventListener('change',(e)=>injectSelectedFileToInput(e?.target?.files?.[0],'file'));
-  document.getElementById('image-preview-clear-btn')?.addEventListener('click',clearSelectedImageAttachment);
   dom.chatImportInput?.addEventListener('change',handleChatImportInputChange);
   dom.conversationJsonPickBtn?.addEventListener('click', handleConversationJsonPick);
   dom.conversationJsonInput?.addEventListener('change', handleConversationJsonInputChange);
