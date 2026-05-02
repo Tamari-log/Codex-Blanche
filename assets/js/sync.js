@@ -76,6 +76,7 @@ function createDriveSync(deps) {
     await new Promise((resolve, reject) => {
       const prev = this.tokenClient.callback;
       this.tokenClient.callback = (resp) => {
+<<<<<<< HEAD
         if (resp?.error) {
           if (resp.error === 'popup_failed_to_open') {
             reject(new Error('Google認証ポップアップを開けませんでした。サイトのポップアップ許可設定を確認してください。'));
@@ -88,6 +89,9 @@ function createDriveSync(deps) {
           reject(new Error(getErrorMessage(resp)));
           return;
         }
+=======
+        if (resp?.error) { reject(new Error(getErrorMessage(resp))); return; }
+>>>>>>> origin/main
         this.accessToken = resp.access_token;
         gapi.client.setToken({ access_token: resp.access_token });
         this.setStatus('Drive: 接続済み');
