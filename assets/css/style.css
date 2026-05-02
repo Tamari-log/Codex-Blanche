@@ -664,11 +664,62 @@ body { font-family: 'Noto Serif JP', serif; }
 .ai-msg h2 { font-size: 1.1rem; }
 .ai-msg h3 { font-size: 1rem; }
 .ai-msg ul { list-style: disc; margin: 0.4rem 0 0.4rem 1.3rem; padding: 0; }
+.ai-msg ol { list-style: decimal; margin: 0.4rem 0 0.4rem 1.4rem; padding: 0; }
 .ai-msg li { margin: 0.15rem 0; }
+.ai-msg .task-list-item {
+    list-style: none;
+    margin-left: -1.1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+}
+.ai-msg .task-list-item input[type="checkbox"] {
+    margin-top: 0.32rem;
+}
+.ai-msg blockquote {
+    margin: 0.5rem 0;
+    padding: 0.2rem 0 0.2rem 0.8rem;
+    border-left: 3px solid rgba(100, 116, 139, 0.55);
+    color: rgba(51, 65, 85, 0.92);
+}
+.ai-msg hr {
+    border: none;
+    border-top: 1px solid rgba(100, 116, 139, 0.45);
+    margin: 0.65rem 0;
+}
+.ai-msg table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.55rem 0;
+    font-size: 0.95em;
+}
+.ai-msg th, .ai-msg td {
+    border: 1px solid rgba(100, 116, 139, 0.35);
+    padding: 0.35rem 0.45rem;
+    vertical-align: top;
+}
+.ai-msg th {
+    font-weight: 700;
+    background: rgba(51, 65, 85, 0.08);
+}
 .ai-msg code { background: rgba(51, 65, 85, 0.12); border-radius: 0.3rem; padding: 0.08rem 0.3rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
 .ai-msg pre { background: rgba(15, 23, 42, 0.08); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: 0.5rem; padding: 0.65rem; overflow-x: auto; }
 .ai-msg pre code { background: transparent; border-radius: 0; padding: 0; }
 .ai-msg a { color: #1d4ed8; text-decoration: underline; }
+.ai-msg del { opacity: 0.82; }
 .dark .ai-msg code { background: rgba(148, 163, 184, 0.22); }
 .dark .ai-msg pre { background: rgba(15, 23, 42, 0.75); border-color: rgba(148, 163, 184, 0.35); }
 .dark .ai-msg a { color: #93c5fd; }
+.dark .ai-msg blockquote {
+    border-left-color: rgba(148, 163, 184, 0.55);
+    color: rgba(226, 232, 240, 0.9);
+}
+.dark .ai-msg hr {
+    border-top-color: rgba(148, 163, 184, 0.4);
+}
+.dark .ai-msg th, .dark .ai-msg td {
+    border-color: rgba(148, 163, 184, 0.35);
+}
+.dark .ai-msg th {
+    background: rgba(148, 163, 184, 0.14);
+}

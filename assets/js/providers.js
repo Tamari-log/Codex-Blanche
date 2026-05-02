@@ -86,12 +86,10 @@ function buildProviderConnectionError(providerLabel, error) {
 async function callGeminiAPI(messages, apiKey, options = {}) {
   const model = options.model || 'gemini-3.1-pro-preview';
   const hasOnChunk = typeof options.onChunk === 'function';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContentStream?alt=sse`;
-  console.info('[stream][gemini][req] start', {
-    model,
-    hasOnChunk,
-    messageCount: Array.isArray(messages) ? messages.length : 0,
-  });
+  const encodedApiKey = encodeURIComponent(apiKey || '');
+  const streamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodedApiKey}`;
+  const nonStreamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodedApiKey}`;
+  console.info('[stream][gemini][req] start', { model, hasOnChunk, messageCount: Array.isArray(messages) ? messages.length : 0 });
 
   const systemMessage = options.systemInstruction
     || messages.find((msg) => msg.role === 'system')?.text
@@ -112,19 +110,61 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     body.system_instruction = { parts: [{ text: systemMessage }] };
   }
 
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  const readErrorDetail = async (response) => {
+    try {
+      const err = await response.json();
+      return err?.error?.message || JSON.stringify(err);
+    } catch {
+      return response.text();
+    }
+  };
+
+  const callGeminiNonStream = async () => {
+    let response;
+    try {
+      response = await fetch(nonStreamUrl, {
+        method: 'POST',
+        signal: options.signal,
+        headers,
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      throw buildProviderConnectionError('Gemini', error);
+    }
+
+    if (!response.ok) {
+      const detail = await readErrorDetail(response);
+      throw new Error(`Gemini API リクエストに失敗しました（${response.status}）: ${detail}`);
+    }
+
+    const data = await response.json();
+    const candidate = data?.candidates?.[0];
+    if (candidate?.finishReason === 'SAFETY') {
+      throw new Error('Geminiの安全フィルタにより応答がブロックされました');
+    }
+    const text = candidate?.content?.parts?.map((part) => part?.text || '').join('') || '';
+    return text || '応答を取得できませんでした。';
+  };
+
   let response;
   try {
-    response = await fetch(url, {
+    response = await fetch(streamUrl, {
       method: 'POST',
       signal: options.signal,
       headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
+        ...headers,
+        Accept: 'text/event-stream',
       },
       body: JSON.stringify(body),
     });
   } catch (error) {
-    throw buildProviderConnectionError('Gemini', error);
+    if (!hasOnChunk || error?.name === 'AbortError') throw buildProviderConnectionError('Gemini', error);
+    console.warn('[stream][gemini] 接続エラーのため通常応答へフォールバックします。', error);
+    return callGeminiNonStream();
   }
   console.info('[stream][gemini][req] response', {
     status: response.status,
@@ -134,16 +174,18 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
   });
 
   if (!response.ok) {
-    let detail = '';
-    try {
-      const err = await response.json();
-      detail = err?.error?.message || JSON.stringify(err);
-    } catch {
-      detail = await response.text();
+    const detail = await readErrorDetail(response);
+    if (hasOnChunk && [400, 404, 405].includes(response.status)) {
+      console.warn('[stream][gemini] ストリーミング未対応の可能性があるため通常応答へフォールバックします。', { status: response.status, detail });
+      return callGeminiNonStream();
     }
     throw new Error(`Gemini API リクエストに失敗しました（${response.status}）: ${detail}`);
   }
   if (!response.body) {
+    if (hasOnChunk) {
+      console.warn('[stream][gemini] ストリームボディが無いため通常応答へフォールバックします。');
+      return callGeminiNonStream();
+    }
     throw new Error('Gemini API が読み取り可能なストリームを返しませんでした');
   }
 
@@ -151,30 +193,38 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
   const decoder = new TextDecoder();
   let buffer = '';
   let fullText = '';
+  let pendingEventDataLines = [];
+  let streamChunkCount = 0;
+  let firstChunkAtMs = 0;
+  const streamStartedAt = Date.now();
 
-  const flushEvent = (eventText) => {
-    const chunks = [];
-    const lines = eventText.split(/\r?\n/);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('data:')) continue;
-      const raw = trimmed.slice(5).trim();
-      if (!raw || raw === '[DONE]') continue;
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        continue;
-      }
-      const firstCandidate = parsed?.candidates?.[0];
-      if (firstCandidate?.finishReason === 'SAFETY') {
-        throw new Error('Geminiの安全フィルタにより応答がブロックされました');
-      }
-      const delta = firstCandidate?.content?.parts?.map((part) => part?.text || '').join('') || '';
-      if (!delta) continue;
-      chunks.push(delta);
+  const parseDeltaFromRaw = (rawText) => {
+    const raw = String(rawText || '').trim();
+    if (!raw || raw === '[DONE]') return '';
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return '';
     }
-    return chunks;
+    const firstCandidate = parsed?.candidates?.[0];
+    if (firstCandidate?.finishReason === 'SAFETY') {
+      throw new Error('Geminiの安全フィルタにより応答がブロックされました');
+    }
+    return firstCandidate?.content?.parts?.map((part) => part?.text || '').join('') || '';
+  };
+
+  const pushParsedText = (rawText, sink) => {
+    const text = parseDeltaFromRaw(rawText);
+    if (!text) return;
+    sink.push(text);
+  };
+
+  const flushPendingEvent = (sink) => {
+    if (!pendingEventDataLines.length) return;
+    const raw = pendingEventDataLines.join('\n');
+    pendingEventDataLines = [];
+    pushParsedText(raw, sink);
   };
 
   async function* streamGeminiChunks() {
@@ -182,32 +232,82 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const events = buffer.split('\n\n');
-      buffer = events.pop() || '';
-      for (const eventText of events) {
-        for (const delta of flushEvent(eventText)) {
-          yield delta;
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+      const parsedChunks = [];
+      for (const line of lines) {
+        if (!line.trim()) {
+          flushPendingEvent(parsedChunks);
+          continue;
         }
+        if (!line.startsWith('data:')) continue;
+        const raw = line.slice(5).trimStart();
+        if (!raw || raw === '[DONE]') continue;
+        if (!pendingEventDataLines.length) {
+          const singleLineDelta = parseDeltaFromRaw(raw);
+          if (singleLineDelta) {
+            parsedChunks.push(singleLineDelta);
+            continue;
+          }
+        }
+        pendingEventDataLines.push(raw);
+      }
+      for (const text of parsedChunks) {
+        yield text;
       }
     }
     buffer += decoder.decode();
+    const tailChunks = [];
     if (buffer.trim()) {
-      for (const delta of flushEvent(buffer)) {
-        yield delta;
+      if (buffer.startsWith('data:')) {
+        pendingEventDataLines.push(buffer.slice(5).trimStart());
+      } else {
+        pushParsedText(buffer, tailChunks);
       }
+    }
+    flushPendingEvent(tailChunks);
+    for (const text of tailChunks) {
+      yield text;
     }
   }
 
-  for await (const chunkText of streamGeminiChunks()) {
-    fullText += chunkText;
-    if (hasOnChunk) {
-      options.onChunk(chunkText, fullText);
+  try {
+    let chunksSinceUiYield = 0;
+    for await (const chunkText of streamGeminiChunks()) {
+      let deltaText = chunkText || '';
+      if (fullText && deltaText.startsWith(fullText)) {
+        deltaText = deltaText.slice(fullText.length);
+      }
+      if (!deltaText) continue;
+      fullText += deltaText;
+      streamChunkCount += 1;
+      if (!firstChunkAtMs) firstChunkAtMs = Date.now();
+      if (hasOnChunk) {
+        options.onChunk(deltaText, fullText);
+        chunksSinceUiYield += 1;
+        // 受信ループが連続実行されるとブラウザ再描画が起きず、
+        // 見た目が「一気に表示」になるため、定期的に制御を返す。
+        if (chunksSinceUiYield >= 1) {
+          chunksSinceUiYield = 0;
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
     }
+  } catch (error) {
+    if (!hasOnChunk || error?.name === 'AbortError') throw error;
+    if (fullText.length > 0) {
+      console.warn('[stream][gemini] 受信中エラーのため、受信済みテキストを返します。', error);
+      return fullText;
+    }
+    console.warn('[stream][gemini] 受信中エラーのため通常応答へフォールバックします。', error);
+    return callGeminiNonStream();
   }
 
   console.info('[stream][gemini][res] parsed', {
     hasCandidates: fullText.length > 0,
     candidateCount: fullText.length > 0 ? 1 : 0,
+    streamChunkCount,
+    firstChunkLatencyMs: firstChunkAtMs ? (firstChunkAtMs - streamStartedAt) : -1,
   });
   return fullText || '応答を取得できませんでした。';
 }
