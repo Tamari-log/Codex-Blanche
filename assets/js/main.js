@@ -550,7 +550,17 @@ function syncComposerGrowOffset() {
   const paddingBottom = Number.parseFloat(computed.paddingBottom) || 0;
   const baseHeight = lineHeight + paddingTop + paddingBottom;
   const growOffset = Math.max(0, userInput.offsetHeight - baseHeight);
+
+  const previewWrap = document.getElementById('image-preview-wrap');
+  let previewOffset = 0;
+  if (previewWrap && !previewWrap.classList.contains('hidden')) {
+    const previewStyle = window.getComputedStyle(previewWrap);
+    const marginBottom = Number.parseFloat(previewStyle.marginBottom) || 0;
+    previewOffset = previewWrap.offsetHeight + marginBottom;
+  }
+
   document.documentElement.style.setProperty('--composer-grow-offset', `${growOffset}px`);
+  document.documentElement.style.setProperty('--composer-preview-offset', `${previewOffset}px`);
 }
 
 userInput.addEventListener('input', function () {
