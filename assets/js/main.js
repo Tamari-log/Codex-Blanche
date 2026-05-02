@@ -418,6 +418,7 @@ function renderImagePreview() {
     wrap.classList.add('hidden');
     img.removeAttribute('src');
     name.textContent = '';
+    syncComposerGrowOffset();
     return;
   }
   const [first] = selectedImageAttachments;
@@ -426,6 +427,7 @@ function renderImagePreview() {
   name.textContent = selectedImageAttachments.length === 1
     ? first.file.name
     : `${first.file.name} ほか${selectedImageAttachments.length - 1}件`;
+  syncComposerGrowOffset();
 }
 
 function clearSelectedImageAttachment() {
