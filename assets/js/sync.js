@@ -37,29 +37,42 @@ function createDriveSync(deps) {
       });
       await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
       if (!gapi.client.drive?.files) throw new Error('Drive API の初期化に失敗しました');
+      this._ensureTokenClientReady();
       this.setStatus('Drive: Client準備完了（未接続）');
     })();
     return this._initPromise;
+  },
+  _ensureTokenClientReady() {
+    if (this.tokenClient) return;
+    if (!state.settings.googleClientId) return;
+    if (!window.google?.accounts?.oauth2) return;
+    this.tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: state.settings.googleClientId,
+      scope: DRIVE_SCOPE,
+      callback: (response) => {
+        if (response?.error) return;
+        this.accessToken = response.access_token;
+        gapi.client.setToken({ access_token: response.access_token });
+        this.setStatus('Drive: 接続済み');
+      },
+    });
   },
   async ensureTokenClient() {
     await this.init();
     if (!state.settings.googleClientId) throw new Error('Google Client ID を設定してください');
     if (!window.google?.accounts?.oauth2) throw new Error('Google Identity Services が未読み込みです');
-    if (!this.tokenClient) {
-      this.tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: state.settings.googleClientId,
-        scope: DRIVE_SCOPE,
-        callback: (response) => {
-          if (response?.error) throw new Error(getErrorMessage(response));
-          this.accessToken = response.access_token;
-          gapi.client.setToken({ access_token: response.access_token });
-          this.setStatus('Drive: 接続済み');
-        },
-      });
-    }
+    this._ensureTokenClientReady();
+    if (!this.tokenClient) throw new Error('Google認証クライアントの初期化に失敗しました');
   },
   async signIn(interactive = true) {
-    await this.ensureTokenClient();
+    if (interactive) {
+      this._ensureTokenClientReady();
+      if (!this.tokenClient) {
+        throw new Error('Google認証の準備が未完了です。数秒待ってから再度お試しください。');
+      }
+    } else {
+      await this.ensureTokenClient();
+    }
     await new Promise((resolve, reject) => {
       const prev = this.tokenClient.callback;
       this.tokenClient.callback = (resp) => {
