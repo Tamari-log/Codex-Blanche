@@ -508,10 +508,83 @@ function handleVisibilityDuringGeneration() {
   requestWakeLockIfAvailable();
 }
 
-async function handleSend(){if(currentRequestController){currentRequestController.abort();return;}const text=userInput.value.trim();if(!text&&!selectedImageAttachments.length&&!selectedFileAttachments.length)return;const s=getActiveSession();if(!s)return;const effectiveSettings=getEffectiveSettings();const provider=effectiveSettings.provider||state.settings.provider;const apiKey=provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const controller=new AbortController();currentRequestController=controller;await requestWakeLockIfAvailable();appUi.setThinkingMode(dom.sendBtn, true, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });const outgoing={role:'user',text};const attachments=[];if(selectedImageAttachments.length){attachments.push(...selectedImageAttachments.map((attachment)=>({type:'image',mimeType:attachment.mimeType,dataUrl:attachment.dataUrl,name:attachment.file.name})));}if(selectedFileAttachments.length){attachments.push(...selectedFileAttachments.map((attachment)=>({type:'file',mimeType:attachment.mimeType,name:attachment.name})));}if(attachments.length){outgoing.attachments=attachments;}s.messages.push(outgoing);await persistState();renderHistory();userInput.value='';userInput.dispatchEvent(new Event('input'));clearSelectedImageAttachment();selectedFileAttachments=[];const loading=addBubble(`思索中...
-${BACKGROUND_WARNING_TEXT}`,'ai');let streamedReply='';let hasStreamStarted=false;const shouldStream=provider==='gemini';console.info('[stream][send] request start',{provider,shouldStream,messageCount:s.messages.length});const onChunk=(delta,fullText)=>{if(!hasStreamStarted){console.info('[stream][send] first chunk',{provider,deltaLength:(delta||'').length});}hasStreamStarted=true;streamedReply=fullText||`${streamedReply}${delta||''}`;loading.div.innerText=streamedReply;updateScrollToBottomButtonVisibility();chatArea.scrollTop=chatArea.scrollHeight;};try{const reply=await appApi.generateAssistantReply({ provider, messages: [...s.messages], apiKey, settings: effectiveSettings, signal: controller.signal, onChunk: shouldStream?onChunk:undefined });const finalReply=reply||streamedReply;console.info('[stream][send] request end',{provider,hasStreamStarted,replyLength:(reply||'').length,streamedReplyLength:streamedReply.length,finalReplySource:reply?'reply':'streamedReply'});if(!hasStreamStarted){await appUi.revealWithQuillEffect(chatArea, loading.div, finalReply);}s.messages.push({role:'ai',text:finalReply});await persistState();renderHistory();}catch(e){console.error('[stream][send] request failed',{provider,errorName:e?.name,errorMessage:e?.message,streamedReplyLength:streamedReply.length});if(e?.name==='AbortError'){loading.div.innerText=streamedReply||'生成を中断しました。';}else{const detail=`
+async function handleSend(){
+  if(currentRequestController){currentRequestController.abort();return;}
+  const text=userInput.value.trim();
+  if(!text&&!selectedImageAttachments.length&&!selectedFileAttachments.length)return;
+  const s=getActiveSession();
+  if(!s)return;
+  const effectiveSettings=getEffectiveSettings();
+  const provider=effectiveSettings.provider||state.settings.provider;
+  const apiKey=provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;
+  if(!apiKey)return;
 
-エラー：${e.message||e}`;loading.div.innerText=`${streamedReply||''}${detail}`.trim();}appUi.addTransientDeleteButton(loading.wrap);}finally{currentRequestController=null;releaseWakeLock();appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });userInput.focus();}}
+  const controller=new AbortController();
+  currentRequestController=controller;
+  await requestWakeLockIfAvailable();
+  appUi.setThinkingMode(dom.sendBtn, true, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });
+
+  let loading=null;
+  let streamedReply='';
+  let hasStreamStarted=false;
+
+  try{
+    const outgoing={role:'user',text};
+    const attachments=[];
+    if(selectedImageAttachments.length){attachments.push(...selectedImageAttachments.map((attachment)=>({type:'image',mimeType:attachment.mimeType,dataUrl:attachment.dataUrl,name:attachment.file.name})));}
+    if(selectedFileAttachments.length){attachments.push(...selectedFileAttachments.map((attachment)=>({type:'file',mimeType:attachment.mimeType,name:attachment.name})));}
+    if(attachments.length){outgoing.attachments=attachments;}
+
+    s.messages.push(outgoing);
+    await persistState();
+    renderHistory();
+    userInput.value='';
+    userInput.dispatchEvent(new Event('input'));
+    clearSelectedImageAttachment();
+    selectedFileAttachments=[];
+
+    loading=addBubble(`思索中...
+${BACKGROUND_WARNING_TEXT}`,'ai');
+    const shouldStream=provider==='gemini';
+    console.info('[stream][send] request start',{provider,shouldStream,messageCount:s.messages.length});
+
+    const onChunk=(delta,fullText)=>{
+      if(!hasStreamStarted){console.info('[stream][send] first chunk',{provider,deltaLength:(delta||'').length});}
+      hasStreamStarted=true;
+      streamedReply=fullText||`${streamedReply}${delta||''}`;
+      if(loading?.div){
+        loading.div.innerText=streamedReply;
+        updateScrollToBottomButtonVisibility();
+        chatArea.scrollTop=chatArea.scrollHeight;
+      }
+    };
+
+    const reply=await appApi.generateAssistantReply({ provider, messages: [...s.messages], apiKey, settings: effectiveSettings, signal: controller.signal, onChunk: shouldStream?onChunk:undefined });
+    const finalReply=reply||streamedReply;
+    console.info('[stream][send] request end',{provider,hasStreamStarted,replyLength:(reply||'').length,streamedReplyLength:streamedReply.length,finalReplySource:reply?'reply':'streamedReply'});
+    if(loading?.div&&!hasStreamStarted){await appUi.revealWithQuillEffect(chatArea, loading.div, finalReply);}
+    s.messages.push({role:'ai',text:finalReply});
+    await persistState();
+    renderHistory();
+  }catch(e){
+    console.error('[stream][send] request failed',{provider,errorName:e?.name,errorMessage:e?.message,streamedReplyLength:streamedReply.length});
+    if(loading?.div){
+      if(e?.name==='AbortError'){loading.div.innerText=streamedReply||'生成を中断しました。';}
+      else{const detail=`
+
+エラー：${e.message||e}`;loading.div.innerText=`${streamedReply||''}${detail}`.trim();}
+      appUi.addTransientDeleteButton(loading.wrap);
+    }else{
+      const detail=e?.message||String(e);
+      window.alert(`送信処理に失敗しました: ${detail}`);
+    }
+  }finally{
+    currentRequestController=null;
+    releaseWakeLock();
+    appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });
+    userInput.focus();
+  }
+}
 async function deleteMessage(index){const s=getActiveSession();if(!s?.messages[index])return;s.messages.splice(index,1);await persistState();renderHistory();}
 async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[index])return;const target=s.messages[index];if(target.role!=='user'&&target.role!=='ai')return;const effectiveSettings=getEffectiveSettings();const provider=effectiveSettings.provider||state.settings.provider;const apiKey=provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const context=target.role==='user'?s.messages.slice(0,index+1):s.messages.slice(0,index);s.messages=context;await persistState();renderHistory();const loading=addBubble('思索中...','ai');try{const reply=await appApi.generateAssistantReply({ provider, messages: context, apiKey, settings: effectiveSettings });s.messages.push({role:'ai',text:reply});await persistState();await appUi.revealWithQuillEffect(chatArea, loading.div, reply);renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;appUi.addTransientDeleteButton(loading.wrap);}}
 async function deleteSessionById(sessionId){const target=state.sessions.find((x)=>x.id===sessionId);if(!target)return;const confirmed=window.confirm(`会話「${target.title}」を削除しますか？\nこの操作は取り消せません。`);if(!confirmed)return;state.sessions=state.sessions.filter((x)=>x.id!==target.id);if(state.sessions.length===0){await startNewSession();return;}if(state.activeSessionId===target.id)state.activeSessionId=state.sessions[0].id;renderHistory();renderSessionList();renderPersonaTabs();await persistState();}
