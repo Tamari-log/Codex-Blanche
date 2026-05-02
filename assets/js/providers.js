@@ -3,11 +3,32 @@ function normalizeGeminiContents(messages) {
 
   messages
     .filter((msg) => msg.role !== 'system')
-    .filter((msg) => typeof msg.text === 'string' && msg.text.trim().length > 0)
+    .filter((msg) => {
+      const textOk = typeof msg.text === 'string' && msg.text.trim().length > 0;
+      const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+      const hasImage = attachments.some(
+        (item) => item?.type === 'image' && typeof item.dataUrl === 'string' && item.dataUrl.startsWith('data:image/')
+      );
+      const hasFile = attachments.some((item) => item?.type === 'file' && typeof item.name === 'string' && item.name.trim().length > 0);
+      return textOk || hasImage || hasFile;
+    })
     .forEach((msg) => {
       const role = msg.role === 'ai' ? 'model' : 'user';
-      const text = msg.text.trim();
       const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+      const fileLines = attachments
+        .filter((item) => item?.type === 'file' && typeof item.name === 'string' && item.name.trim().length > 0)
+        .map((item) => {
+          const mime = typeof item.mimeType === 'string' && item.mimeType.trim().length ? item.mimeType.trim() : 'unknown';
+          return `- ${item.name.trim()} (${mime})`;
+        });
+      let text = typeof msg.text === 'string' ? msg.text.trim() : '';
+      if (fileLines.length) {
+        const fileBlock = ['[添付ファイル（ファイル内容は送信されず名前のみ）]', ...fileLines].join('\n');
+        text = text ? `${text}\n\n${fileBlock}` : fileBlock;
+      }
+      if (!text && attachments.some((item) => item?.type === 'image')) {
+        text = '(添付のみ)';
+      }
       const imageParts = attachments
         .filter((item) => item?.type === 'image' && typeof item.dataUrl === 'string' && item.dataUrl.startsWith('data:image/'))
         .map((item) => {
@@ -84,10 +105,10 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     } catch {
       detail = await response.text();
     }
-    throw new Error(`Gemini API request failed (${response.status}): ${detail}`);
+    throw new Error(`Gemini API リクエストに失敗しました（${response.status}）: ${detail}`);
   }
   if (!response.body) {
-    throw new Error('Gemini API did not return a readable stream');
+    throw new Error('Gemini API が読み取り可能なストリームを返しませんでした');
   }
 
   const reader = response.body.getReader();
@@ -111,7 +132,7 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
       }
       const firstCandidate = parsed?.candidates?.[0];
       if (firstCandidate?.finishReason === 'SAFETY') {
-        throw new Error('SAFETY_REFUSAL: Gemini safety filter blocked the response');
+        throw new Error('Geminiの安全フィルタにより応答がブロックされました');
       }
       const delta = firstCandidate?.content?.parts?.map((part) => part?.text || '').join('') || '';
       if (!delta) continue;
@@ -160,10 +181,21 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
   const instructions = messages.find((m) => m.role === 'system')?.text || '';
   const toOpenAIContentParts = (message) => {
     const parts = [];
-    if (typeof message.text === 'string' && message.text) {
-      parts.push({ type: 'input_text', text: message.text });
-    }
     const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+    const fileLines = attachments
+      .filter((item) => item?.type === 'file' && typeof item.name === 'string' && item.name.trim().length > 0)
+      .map((item) => {
+        const mime = typeof item.mimeType === 'string' && item.mimeType.trim().length ? item.mimeType.trim() : 'unknown';
+        return `- ${item.name.trim()} (${mime})`;
+      });
+    let text = typeof message.text === 'string' ? message.text : '';
+    if (fileLines.length) {
+      const fileBlock = ['[添付ファイル（ファイル内容は送信されず名前のみ）]', ...fileLines].join('\n');
+      text = text.trim().length ? `${text.trim()}\n\n${fileBlock}` : fileBlock;
+    }
+    if (typeof text === 'string' && text.trim().length) {
+      parts.push({ type: 'input_text', text: text.trim() });
+    }
     attachments
       .filter((item) => item?.type === 'image' && typeof item.dataUrl === 'string' && item.dataUrl.startsWith('data:image/'))
       .forEach((item) => {
@@ -203,7 +235,7 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
     } catch {
       detail = await response.text();
     }
-    throw new Error(`OpenAI API request failed (${response.status}): ${detail}`);
+    throw new Error(`OpenAI API リクエストに失敗しました（${response.status}）: ${detail}`);
   }
   const data = await response.json();
   return data.output_text || '応答を取得できませんでした。';
