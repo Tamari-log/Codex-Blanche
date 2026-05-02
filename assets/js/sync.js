@@ -111,21 +111,11 @@ function createDriveSync(deps) {
         this.tokenClient.callback = prev;
         resolve();
       };
-      this.tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : 'none' });
+      this.tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
     });
   },
   async signOut() { await this.init(); this.accessToken = null; gapi.client.setToken(null); this.setStatus('Drive: 未接続'); },
-  async ensureReady() {
-    await this.init();
-    if (!this.accessToken) {
-      try {
-        await this.signIn(false);
-      } catch {
-        throw new Error('Drive未接続です。設定から「Google接続」を押してログインしてください。');
-      }
-    }
-    await this.ensureFolderAndFile();
-  },
+  async ensureReady() { await this.init(); if (!this.accessToken) await this.signIn(false); await this.ensureFolderAndFile(); },
   async ensureFolderAndFile() {
     const folderName = this.getDriveFolderName().replace(/'/g, "\\'");
     const fileName = this.getDriveFileName().replace(/'/g, "\\'");
