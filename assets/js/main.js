@@ -398,7 +398,7 @@ function closeSystemPresetPanel(){state.ui.showSystemPresetPanel=false;renderSys
 function renderSystemPresetPanel(){const p=document.getElementById('system-preset-panel');const t=document.getElementById('system-preset-toggle');const b=document.getElementById('system-preset-backdrop');p.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.classList.toggle('is-open',state.ui.showSystemPresetPanel);b?.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.setAttribute('aria-expanded',state.ui.showSystemPresetPanel?'true':'false');}
 let currentRequestController = null;
 let wakeLockSentinel = null;
-let selectedImageAttachment = null;
+let selectedImageAttachments = [];
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -414,19 +414,22 @@ function renderImagePreview() {
   const img = document.getElementById('image-preview');
   const name = document.getElementById('image-preview-name');
   if (!wrap || !img || !name) return;
-  if (!selectedImageAttachment) {
+  if (!selectedImageAttachments.length) {
     wrap.classList.add('hidden');
     img.removeAttribute('src');
     name.textContent = '';
     return;
   }
+  const [first] = selectedImageAttachments;
   wrap.classList.remove('hidden');
-  img.src = selectedImageAttachment.dataUrl;
-  name.textContent = selectedImageAttachment.file.name;
+  img.src = first.dataUrl;
+  name.textContent = selectedImageAttachments.length === 1
+    ? first.file.name
+    : `${first.file.name} ほか${selectedImageAttachments.length - 1}件`;
 }
 
 function clearSelectedImageAttachment() {
-  selectedImageAttachment = null;
+  selectedImageAttachments = [];
   renderImagePreview();
 }
 
@@ -459,7 +462,7 @@ function handleVisibilityDuringGeneration() {
   requestWakeLockIfAvailable();
 }
 
-async function handleSend(){if(currentRequestController){currentRequestController.abort();return;}const text=userInput.value.trim();if(!text&&!selectedImageAttachment)return;const s=getActiveSession();if(!s)return;const effectiveSettings=getEffectiveSettings();const provider=effectiveSettings.provider||state.settings.provider;const apiKey=provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const controller=new AbortController();currentRequestController=controller;await requestWakeLockIfAvailable();appUi.setThinkingMode(dom.sendBtn, true, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });const outgoing={role:'user',text};if(selectedImageAttachment){outgoing.attachments=[{type:'image',mimeType:selectedImageAttachment.mimeType,dataUrl:selectedImageAttachment.dataUrl,name:selectedImageAttachment.file.name}];}s.messages.push(outgoing);await persistState();renderHistory();userInput.value='';userInput.dispatchEvent(new Event('input'));clearSelectedImageAttachment();const loading=addBubble(`思索中...
+async function handleSend(){if(currentRequestController){currentRequestController.abort();return;}const text=userInput.value.trim();if(!text&&!selectedImageAttachments.length)return;const s=getActiveSession();if(!s)return;const effectiveSettings=getEffectiveSettings();const provider=effectiveSettings.provider||state.settings.provider;const apiKey=provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const controller=new AbortController();currentRequestController=controller;await requestWakeLockIfAvailable();appUi.setThinkingMode(dom.sendBtn, true, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });const outgoing={role:'user',text};if(selectedImageAttachments.length){outgoing.attachments=selectedImageAttachments.map((attachment)=>({type:'image',mimeType:attachment.mimeType,dataUrl:attachment.dataUrl,name:attachment.file.name}));}s.messages.push(outgoing);await persistState();renderHistory();userInput.value='';userInput.dispatchEvent(new Event('input'));clearSelectedImageAttachment();const loading=addBubble(`思索中...
 ${BACKGROUND_WARNING_TEXT}`,'ai');let streamedReply='';let hasStreamStarted=false;const shouldStream=provider==='gemini';console.info('[stream][send] request start',{provider,shouldStream,messageCount:s.messages.length});const onChunk=(delta,fullText)=>{if(!hasStreamStarted){console.info('[stream][send] first chunk',{provider,deltaLength:(delta||'').length});}hasStreamStarted=true;streamedReply=fullText||`${streamedReply}${delta||''}`;loading.div.innerText=streamedReply;updateScrollToBottomButtonVisibility();chatArea.scrollTop=chatArea.scrollHeight;};try{const reply=await appApi.generateAssistantReply({ provider, messages: [...s.messages], apiKey, settings: effectiveSettings, signal: controller.signal, onChunk: shouldStream?onChunk:undefined });const finalReply=reply||streamedReply;console.info('[stream][send] request end',{provider,hasStreamStarted,replyLength:(reply||'').length,streamedReplyLength:streamedReply.length,finalReplySource:reply?'reply':'streamedReply'});if(!hasStreamStarted){await appUi.revealWithQuillEffect(chatArea, loading.div, finalReply);}s.messages.push({role:'ai',text:finalReply});await persistState();renderHistory();}catch(e){console.error('[stream][send] request failed',{provider,errorName:e?.name,errorMessage:e?.message,streamedReplyLength:streamedReply.length});if(e?.name==='AbortError'){loading.div.innerText=streamedReply||'生成を中断しました。';}else{const detail=`
 
 エラー：${e.message||e}`;loading.div.innerText=`${streamedReply||''}${detail}`.trim();}appUi.addTransientDeleteButton(loading.wrap);}finally{currentRequestController=null;releaseWakeLock();appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });userInput.focus();}}
@@ -548,7 +551,7 @@ window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, app
   });
   dom.scrollToBottomBtn?.addEventListener('click', scrollChatToBottom);
   dom.attachMenuBtn?.addEventListener('click',openAttachTypeSelector);
-  dom.imageUploadInput?.addEventListener('change',async (e)=>{const file=e?.target?.files?.[0];if(!file)return;try{const dataUrl=await readFileAsDataUrl(file);selectedImageAttachment={file,dataUrl,mimeType:file.type||'image/png'};renderImagePreview();injectSelectedFileToInput(file,'image');}catch(err){window.alert(`画像の添付に失敗しました: ${getErrorMessage(err)}`);}finally{if(e?.target)e.target.value='';}});
+  dom.imageUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;try{const attachments=await Promise.all(files.map(async(file)=>({file,dataUrl:await readFileAsDataUrl(file),mimeType:file.type||'image/png'})));selectedImageAttachments=[...selectedImageAttachments,...attachments];renderImagePreview();}catch(err){window.alert(`画像の添付に失敗しました: ${getErrorMessage(err)}`);}finally{if(e?.target)e.target.value='';}});
   dom.fileUploadInput?.addEventListener('change',(e)=>injectSelectedFileToInput(e?.target?.files?.[0],'file'));
   document.getElementById('image-preview-clear-btn')?.addEventListener('click',clearSelectedImageAttachment);
   dom.chatImportInput?.addEventListener('change',handleChatImportInputChange);
