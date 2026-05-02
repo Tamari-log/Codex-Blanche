@@ -7,12 +7,20 @@ function normalizeGeminiContents(messages) {
     .forEach((msg) => {
       const role = msg.role === 'ai' ? 'model' : 'user';
       const text = msg.text.trim();
+      const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+      const imageParts = attachments
+        .filter((item) => item?.type === 'image' && typeof item.dataUrl === 'string' && item.dataUrl.startsWith('data:image/'))
+        .map((item) => {
+          const [, payload = ''] = item.dataUrl.split(',', 2);
+          return { inline_data: { mime_type: item.mimeType || 'image/png', data: payload } };
+        });
       const prev = normalized[normalized.length - 1];
 
       if (prev && prev.role === role) {
-        prev.parts[0].text = `${prev.parts[0].text}\n\n${text}`;
+        prev.parts.push({ text });
+        prev.parts.push(...imageParts);
       } else {
-        normalized.push({ role, parts: [{ text }] });
+        normalized.push({ role, parts: [{ text }, ...imageParts] });
       }
     });
 
@@ -148,11 +156,25 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
 async function callOpenAIAPI(messages, apiKey, options = {}) {
   const model = options.model || 'gpt-5.3';
   const instructions = messages.find((m) => m.role === 'system')?.text || '';
+  const toOpenAIContentParts = (message) => {
+    const parts = [];
+    if (typeof message.text === 'string' && message.text) {
+      parts.push({ type: 'input_text', text: message.text });
+    }
+    const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+    attachments
+      .filter((item) => item?.type === 'image' && typeof item.dataUrl === 'string' && item.dataUrl.startsWith('data:image/'))
+      .forEach((item) => {
+        parts.push({ type: 'input_image', image_url: item.dataUrl });
+      });
+    return parts.length ? parts : [{ type: 'input_text', text: '' }];
+  };
+
   const input = messages
     .filter((m) => m.role !== 'system')
     .map((m) => ({
       role: m.role === 'ai' ? 'assistant' : m.role,
-      content: [{ type: 'input_text', text: m.text }],
+      content: toOpenAIContentParts(m),
     }));
 
   const response = await fetch('https://api.openai.com/v1/responses', {
