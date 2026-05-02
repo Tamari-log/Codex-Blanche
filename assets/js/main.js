@@ -68,6 +68,8 @@ const SEND_BUTTON_DEFAULT_ICON = '🖋️';
 const SEND_BUTTON_STOP_ICON = '⏹️';
 const SCROLL_BOTTOM_THRESHOLD_PX = 32;
 const MAX_SHARED_FILES = 10;
+const MAX_API_IMAGE_ATTACHMENTS = 6;
+const MAX_API_ATTACHMENT_MESSAGES = 3;
 const BACKGROUND_WARNING_TEXT = '※ バックグラウンド中はOS制限で処理が中断される場合があります。';
 const CHAT_IMPORT_PREFIX = window.appImportExport?.CHAT_IMPORT_PREFIX || '__CODEX_CHATS__';
 let historySearchKeyword = '';
@@ -499,6 +501,32 @@ function releaseWakeLock() {
   wakeLockSentinel = null;
 }
 
+
+
+function buildApiMessages(messages = []) {
+  const source = Array.isArray(messages) ? [...messages].reverse() : [];
+  let remainingAttachmentMessages = MAX_API_ATTACHMENT_MESSAGES;
+  let remainingImageAttachments = MAX_API_IMAGE_ATTACHMENTS;
+
+  return source.map((message) => {
+    if (!Array.isArray(message?.attachments) || !message.attachments.length) return message;
+    if (remainingAttachmentMessages <= 0 || remainingImageAttachments <= 0) {
+      return { ...message, attachments: [] };
+    }
+
+    const nextAttachments = [];
+    for (const attachment of message.attachments) {
+      if (attachment?.type !== 'image') continue;
+      if (remainingImageAttachments <= 0) break;
+      nextAttachments.push(attachment);
+      remainingImageAttachments -= 1;
+    }
+
+    remainingAttachmentMessages -= 1;
+    return { ...message, attachments: nextAttachments };
+  }).reverse();
+}
+
 function handleVisibilityDuringGeneration() {
   if (!currentRequestController) return;
   if (document.hidden) {
@@ -559,7 +587,8 @@ ${BACKGROUND_WARNING_TEXT}`,'ai');
       }
     };
 
-    const reply=await appApi.generateAssistantReply({ provider, messages: [...s.messages], apiKey, settings: effectiveSettings, signal: controller.signal, onChunk: shouldStream?onChunk:undefined });
+    const apiMessages = buildApiMessages(s.messages);
+    const reply=await appApi.generateAssistantReply({ provider, messages: apiMessages, apiKey, settings: effectiveSettings, signal: controller.signal, onChunk: shouldStream?onChunk:undefined });
     const finalReply=reply||streamedReply;
     console.info('[stream][send] request end',{provider,hasStreamStarted,replyLength:(reply||'').length,streamedReplyLength:streamedReply.length,finalReplySource:reply?'reply':'streamedReply'});
     if(loading?.div&&!hasStreamStarted){await appUi.revealWithQuillEffect(chatArea, loading.div, finalReply);}
@@ -586,7 +615,7 @@ ${BACKGROUND_WARNING_TEXT}`,'ai');
   }
 }
 async function deleteMessage(index){const s=getActiveSession();if(!s?.messages[index])return;s.messages.splice(index,1);await persistState();renderHistory();}
-async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[index])return;const target=s.messages[index];if(target.role!=='user'&&target.role!=='ai')return;const effectiveSettings=getEffectiveSettings();const provider=effectiveSettings.provider||state.settings.provider;const apiKey=provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const context=target.role==='user'?s.messages.slice(0,index+1):s.messages.slice(0,index);s.messages=context;await persistState();renderHistory();const loading=addBubble('思索中...','ai');try{const reply=await appApi.generateAssistantReply({ provider, messages: context, apiKey, settings: effectiveSettings });s.messages.push({role:'ai',text:reply});await persistState();await appUi.revealWithQuillEffect(chatArea, loading.div, reply);renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;appUi.addTransientDeleteButton(loading.wrap);}}
+async function regenerateAt(index){const s=getActiveSession();if(!s?.messages[index])return;const target=s.messages[index];if(target.role!=='user'&&target.role!=='ai')return;const effectiveSettings=getEffectiveSettings();const provider=effectiveSettings.provider||state.settings.provider;const apiKey=provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;if(!apiKey)return;const context=target.role==='user'?s.messages.slice(0,index+1):s.messages.slice(0,index);s.messages=context;await persistState();renderHistory();const loading=addBubble('思索中...','ai');try{const apiMessages = buildApiMessages(context);const reply=await appApi.generateAssistantReply({ provider, messages: apiMessages, apiKey, settings: effectiveSettings });s.messages.push({role:'ai',text:reply});await persistState();await appUi.revealWithQuillEffect(chatArea, loading.div, reply);renderHistory();}catch(e){loading.div.innerText=`エラー：${e.message||e}`;appUi.addTransientDeleteButton(loading.wrap);}}
 async function deleteSessionById(sessionId){const target=state.sessions.find((x)=>x.id===sessionId);if(!target)return;const confirmed=window.confirm(`会話「${target.title}」を削除しますか？\nこの操作は取り消せません。`);if(!confirmed)return;state.sessions=state.sessions.filter((x)=>x.id!==target.id);if(state.sessions.length===0){await startNewSession();return;}if(state.activeSessionId===target.id)state.activeSessionId=state.sessions[0].id;renderHistory();renderSessionList();renderPersonaTabs();await persistState();}
 async function deleteActiveSession(){const s=getActiveSession();if(!s)return;await deleteSessionById(s.id);}
 async function renameSessionById(sessionId){const session=state.sessions.find((x)=>x.id===sessionId);if(!session)return;const nextName=window.prompt('会話名を入力してください',session.title);if(nextName===null)return;const normalized=nextName.trim();if(!normalized)return;session.title=normalized;renderSessionList();renderPersonaTabs();await persistState();}
