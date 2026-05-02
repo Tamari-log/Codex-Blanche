@@ -76,43 +76,18 @@ function createDriveSync(deps) {
     await new Promise((resolve, reject) => {
       const prev = this.tokenClient.callback;
       this.tokenClient.callback = (resp) => {
-<<<<<<< HEAD
-        if (resp?.error) {
-          if (resp.error === 'popup_failed_to_open') {
-            reject(new Error('Google認証ポップアップを開けませんでした。サイトのポップアップ許可設定を確認してください。'));
-            return;
-          }
-          if (!interactive && (resp.error === 'popup_closed_by_user' || resp.error === 'interaction_required' || resp.error === 'consent_required' || resp.error === 'login_required')) {
-            reject(new Error('Drive自動接続には再認証が必要です。設定から「Google接続」を押してください。'));
-            return;
-          }
-          reject(new Error(getErrorMessage(resp)));
-          return;
-        }
-=======
         if (resp?.error) { reject(new Error(getErrorMessage(resp))); return; }
->>>>>>> origin/main
         this.accessToken = resp.access_token;
         gapi.client.setToken({ access_token: resp.access_token });
         this.setStatus('Drive: 接続済み');
         this.tokenClient.callback = prev;
         resolve();
       };
-      this.tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : 'none' });
+      this.tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
     });
   },
   async signOut() { await this.init(); this.accessToken = null; gapi.client.setToken(null); this.setStatus('Drive: 未接続'); },
-  async ensureReady() {
-    await this.init();
-    if (!this.accessToken) {
-      try {
-        await this.signIn(false);
-      } catch {
-        throw new Error('Drive未接続です。設定から「Google接続」を押してログインしてください。');
-      }
-    }
-    await this.ensureFolderAndFile();
-  },
+  async ensureReady() { await this.init(); if (!this.accessToken) await this.signIn(false); await this.ensureFolderAndFile(); },
   async ensureFolderAndFile() {
     const folderName = this.getDriveFolderName().replace(/'/g, "\\'");
     const fileName = this.getDriveFileName().replace(/'/g, "\\'");
