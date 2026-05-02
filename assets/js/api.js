@@ -1,4 +1,4 @@
-function generateAssistantReply({ provider, messages, apiKey, settings, signal }) {
+function generateAssistantReply({ provider, messages, apiKey, settings, signal, onDelta }) {
   if (provider === 'gemini') {
     return callGeminiAPI(messages, apiKey, {
       model: settings.geminiModel,
@@ -6,6 +6,7 @@ function generateAssistantReply({ provider, messages, apiKey, settings, signal }
       maxTokens: settings.maxTokens,
       systemInstruction: settings.systemPrompt,
       signal,
+      onDelta,
     });
   }
 
@@ -19,6 +20,7 @@ function generateAssistantReply({ provider, messages, apiKey, settings, signal }
     temperature: settings.temperature,
     maxTokens: settings.maxTokens,
     signal,
+    onDelta,
   });
 }
 
