@@ -67,6 +67,7 @@ const MOBILE_MEDIA_QUERY = '(max-width: 768px), (pointer: coarse)';
 const SEND_BUTTON_DEFAULT_ICON = '🖋️';
 const SEND_BUTTON_STOP_ICON = '⏹️';
 const SCROLL_BOTTOM_THRESHOLD_PX = 32;
+const MAX_SHARED_FILES = 10;
 const BACKGROUND_WARNING_TEXT = '※ バックグラウンド中はOS制限で処理が中断される場合があります。';
 const CHAT_IMPORT_PREFIX = window.appImportExport?.CHAT_IMPORT_PREFIX || '__CODEX_CHATS__';
 let historySearchKeyword = '';
@@ -411,6 +412,27 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function ensureAttachmentCapacity(newCount) {
+  const currentCount = selectedImageAttachments.length + selectedFileAttachments.length;
+  const available = Math.max(0, MAX_SHARED_FILES - currentCount);
+  if (available <= 0) {
+    window.alert(`添付ファイルは最大${MAX_SHARED_FILES}件までです。不要な添付を削除してください。`);
+    return 0;
+  }
+  if (newCount > available) window.alert(`添付ファイルは最大${MAX_SHARED_FILES}件までです。先頭${available}件のみ追加します。`);
+  return Math.min(newCount, available);
+}
+
+async function createImageAttachments(files) {
+  const attachments = [];
+  for (const file of files) {
+    const dataUrl = await readFileAsDataUrl(file);
+    attachments.push({ file, dataUrl, mimeType: file.type || 'image/png' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  return attachments;
+}
+
 function renderImagePreview() {
   const wrap = document.getElementById('image-preview-wrap');
   const list = document.getElementById('image-preview-list');
@@ -585,8 +607,8 @@ window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, app
   });
   dom.scrollToBottomBtn?.addEventListener('click', scrollChatToBottom);
   dom.attachMenuBtn?.addEventListener('click',openAttachTypeSelector);
-  dom.imageUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;try{const attachments=await Promise.all(files.map(async(file)=>({file,dataUrl:await readFileAsDataUrl(file),mimeType:file.type||'image/png'})));selectedImageAttachments=[...selectedImageAttachments,...attachments];renderImagePreview();}catch(err){window.alert(`画像の添付に失敗しました: ${getErrorMessage(err)}`);}finally{if(e?.target)e.target.value='';}});
-  dom.fileUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;selectedFileAttachments=[...selectedFileAttachments,...files.map((file)=>({name:file.name,mimeType:file.type||'application/octet-stream'}))];injectSelectedFileToInput(files[0],'file');if(e?.target)e.target.value='';});
+  dom.imageUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;try{const acceptedCount=ensureAttachmentCapacity(files.length);if(!acceptedCount)return;const attachments=await createImageAttachments(files.slice(0,acceptedCount));selectedImageAttachments=[...selectedImageAttachments,...attachments];renderImagePreview();}catch(err){window.alert(`画像の添付に失敗しました: ${getErrorMessage(err)}`);}finally{if(e?.target)e.target.value='';}});
+  dom.fileUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;const acceptedCount=ensureAttachmentCapacity(files.length);if(!acceptedCount){if(e?.target)e.target.value='';return;}const acceptedFiles=files.slice(0,acceptedCount);selectedFileAttachments=[...selectedFileAttachments,...acceptedFiles.map((file)=>({name:file.name,mimeType:file.type||'application/octet-stream'}))];injectSelectedFileToInput(acceptedFiles[0],'file');if(e?.target)e.target.value='';});
   dom.chatImportInput?.addEventListener('change',handleChatImportInputChange);
   dom.conversationJsonPickBtn?.addEventListener('click', handleConversationJsonPick);
   dom.conversationJsonInput?.addEventListener('change', handleConversationJsonInputChange);
