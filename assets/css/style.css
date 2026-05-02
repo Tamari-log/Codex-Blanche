@@ -499,7 +499,7 @@ body { font-family: 'Noto Serif JP', serif; }
 .scroll-to-bottom-btn {
     position: absolute;
     left: 50%;
-    bottom: calc(env(safe-area-inset-bottom) + 6.2rem + var(--composer-grow-offset, 0px));
+    bottom: calc(env(safe-area-inset-bottom) + 6.2rem + var(--composer-grow-offset, 0px) + var(--composer-preview-offset, 0px));
     width: 2.6rem;
     height: 2.6rem;
     border-radius: 9999px;
