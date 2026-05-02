@@ -2,8 +2,8 @@
 async function callGeminiAPI(messages, apiKey, options = {}) {
     const { model = 'gemini-1.5-flash', temperature, maxTokens, systemInstruction, signal, onChunk } = options;
     const useStream = typeof onChunk === 'function';
-    const endpoint = useStream ? 'streamGenerateContent' : 'generateContent';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}${useStream ? '&alt=sse' : ''}`;
+    const endpoint = 'generateContentStream';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}?key=${apiKey}&alt=sse`;
 
     const contents = (Array.isArray(messages) ? messages : [])
       .filter((m) => m && (m.role === 'user' || m.role === 'ai') && typeof m.text === 'string')
@@ -29,11 +29,6 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     });
 
     if (!response.ok) throw new Error('通信の儀式に失敗しました');
-
-    if (!useStream) {
-      const data = await response.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    }
 
     if (!response.body) throw new Error('ストリーミングレスポンスを取得できませんでした');
 
