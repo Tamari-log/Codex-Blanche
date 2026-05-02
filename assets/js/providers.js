@@ -52,6 +52,37 @@ function normalizeGeminiContents(messages) {
   return normalized;
 }
 
+function buildProviderConnectionError(providerLabel, error) {
+  if (error?.name === 'AbortError') return error;
+
+  const rawMessage = (() => {
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) return error.message || '不明な通信エラー';
+    if (typeof error?.message === 'string') return error.message;
+    try { return JSON.stringify(error); } catch { return '不明な通信エラー'; }
+  })();
+
+  const lower = rawMessage.toLowerCase();
+  const looksLikeTransportFailure = lower.includes('load failed')
+    || lower.includes('failed to fetch')
+    || lower.includes('networkerror')
+    || lower.includes('network request failed');
+  const isOffline = typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+
+  if (isOffline) {
+    return new Error(`${providerLabel} APIへの接続に失敗しました（オフライン）。インターネット接続を確認してください。`);
+  }
+  if (looksLikeTransportFailure) {
+    return new Error(
+      `${providerLabel} APIへの接続に失敗しました（通信エラー）。`
+      + ' ネットワーク、VPN/プロキシ、ブラウザ拡張機能、CORS制限を確認してください。'
+      + ` 詳細: ${rawMessage}`
+    );
+  }
+
+  return new Error(`${providerLabel} API呼び出し中にエラーが発生しました: ${rawMessage}`);
+}
+
 async function callGeminiAPI(messages, apiKey, options = {}) {
   const model = options.model || 'gemini-3.1-pro-preview';
   const hasOnChunk = typeof options.onChunk === 'function';
@@ -81,15 +112,20 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     body.system_instruction = { parts: [{ text: systemMessage }] };
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    signal: options.signal,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      signal: options.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw buildProviderConnectionError('Gemini', error);
+  }
   console.info('[stream][gemini][req] response', {
     status: response.status,
     ok: response.ok,
@@ -211,21 +247,26 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
       content: toOpenAIContentParts(m),
     }));
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    signal: options.signal,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      input,
-      instructions: instructions || undefined,
-      temperature: options.temperature,
-      max_output_tokens: options.maxTokens,
-    }),
-  });
+  let response;
+  try {
+    response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: options.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        input,
+        instructions: instructions || undefined,
+        temperature: options.temperature,
+        max_output_tokens: options.maxTokens,
+      }),
+    });
+  } catch (error) {
+    throw buildProviderConnectionError('OpenAI', error);
+  }
 
   if (!response.ok) {
     let detail = '';
