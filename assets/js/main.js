@@ -71,6 +71,12 @@ const SCROLL_BOTTOM_THRESHOLD_PX = 32;
 const MAX_SHARED_FILES = 10;
 const MAX_API_IMAGE_ATTACHMENTS = 6;
 const MAX_API_ATTACHMENT_MESSAGES = 3;
+const MAX_FILE_TEXT_CHARS_PER_FILE = 12000;
+const MAX_FILE_TOTAL_TEXT_CHARS = 36000;
+const MAX_FILE_TEXT_BYTES = 256 * 1024;
+const MAX_FILE_CHUNK_CHARS = 4000;
+const MAX_PDF_PAGES = 40;
+const TEXT_FILE_EXTENSIONS = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'yaml', 'yml', 'xml', 'html', 'css', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'py', 'java', 'go', 'rs', 'c', 'cpp', 'h', 'hpp', 'sql', 'log']);
 const BACKGROUND_WARNING_TEXT = '※ バックグラウンド中はOS制限で処理が中断される場合があります。';
 const CHAT_IMPORT_PREFIX = window.appImportExport?.CHAT_IMPORT_PREFIX || '__CODEX_CHATS__';
 let historySearchKeyword = '';
@@ -133,7 +139,7 @@ function installConsoleLogHook() {
       try {
         appendDevLog(level.toUpperCase(), args);
       } catch (e) {
-        original('[devlog-fallback] appendDevLog failed:', e);
+        original('[devlog-fallback] appendDevLog に失敗:', e);
       }
       original(...args);
     };
@@ -404,8 +410,8 @@ function decodeChatPayloadFromJs(source=''){const text=source.trim();if(!text)re
 function extractSessionsFromImportedPayload(payload){if(Array.isArray(payload))return payload;if(!payload||typeof payload!=='object')return null;if(Array.isArray(payload.sessions))return payload.sessions;if(Array.isArray(payload.worlds)){const sessions=payload.worlds.flatMap((world)=>Array.isArray(world?.sessions)?world.sessions:[]);if(sessions.length)return sessions;}return null;}
 async function importSessionsFromJsFile(){const input=dom.chatImportInput;if(!input)return;input.click();}
 async function handleChatImportInputChange(event){const file=event?.target?.files?.[0];if(!file)return;try{const source=await file.text();const parsed=decodeChatPayloadFromJs(source);const importedSessions=extractSessionsFromImportedPayload(parsed);if(!Array.isArray(importedSessions))throw new Error('会話データが見つかりません。JSON配列またはsessions/worlds形式を使用してください。');const nextSessions=importedSessions.map((entry,index)=>normalizeImportedSession(sanitizeConversationJsonNode(entry),index)).filter((s)=>s.messages.length>0);if(!nextSessions.length)throw new Error('有効な会話データがありません。');const ok=window.confirm(`${nextSessions.length}件の会話を読み込みます。現在の会話履歴は上書きされます。よろしいですか？`);if(!ok)return;state.sessions=nextSessions;state.activeSessionId=nextSessions[0].id;await persistState();renderHistory();renderSessionList();renderPersonaTabs();closeSystemPresetPanel();}catch(e){window.alert(`読み込みに失敗しました: ${getErrorMessage(e)}`);}finally{event.target.value='';}}
-function injectSelectedFileToInput(file,kind){if(!file||!userInput)return;const prefix=kind==='image'?'[画像添付]':'[ファイル添付]';const nextLine=`${prefix} ${file.name}`;userInput.value=[userInput.value.trim(),nextLine].filter(Boolean).join('\n');userInput.dispatchEvent(new Event('input'));userInput.focus();}
-function openAttachTypeSelector(){const backdrop=document.createElement('div');backdrop.className='fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4';const panel=document.createElement('div');panel.className='w-full max-w-xs rounded-2xl bg-white dark:bg-slate-800 shadow-xl p-4 space-y-3';const title=document.createElement('p');title.className='text-sm font-semibold text-slate-700 dark:text-slate-100';title.innerText='添付する種類を選択してください';const buttons=document.createElement('div');buttons.className='grid grid-cols-1 gap-2';const mkBtn=(label,onClick)=>{const btn=document.createElement('button');btn.type='button';btn.className='w-full rounded-lg bg-slate-200 dark:bg-slate-700 dark:text-white py-2 px-3 text-sm';btn.innerText=label;btn.onclick=()=>{close();onClick();};return btn;};const close=()=>backdrop.remove();buttons.appendChild(mkBtn('画像を添付',()=>dom.imageUploadInput?.click()));buttons.appendChild(mkBtn('ファイルを添付',()=>dom.fileUploadInput?.click()));const cancel=mkBtn('キャンセル',()=>{});cancel.className='w-full rounded-lg bg-slate-100 dark:bg-slate-600 dark:text-white py-2 px-3 text-sm';panel.appendChild(title);panel.appendChild(buttons);panel.appendChild(cancel);backdrop.appendChild(panel);backdrop.addEventListener('click',(event)=>{if(event.target===backdrop)close();});document.body.appendChild(backdrop);}
+function injectSelectedFileToInput(file,kind){if(!file||!userInput)return;const prefix=kind==='image'?'[画像添付]':'[ファイル添付（内容はテキスト抽出して送信）]';const nextLine=`${prefix} ${file.name}`;userInput.value=[userInput.value.trim(),nextLine].filter(Boolean).join('\n');userInput.dispatchEvent(new Event('input'));userInput.focus();}
+function openAttachTypeSelector(){const backdrop=document.createElement('div');backdrop.className='fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4';const panel=document.createElement('div');panel.className='w-full max-w-xs rounded-2xl bg-white dark:bg-slate-800 shadow-xl p-4 space-y-3';const title=document.createElement('p');title.className='text-sm font-semibold text-slate-700 dark:text-slate-100';title.innerText='添付する種類を選択してください';const buttons=document.createElement('div');buttons.className='grid grid-cols-1 gap-2';const mkBtn=(label,onClick)=>{const btn=document.createElement('button');btn.type='button';btn.className='w-full rounded-lg bg-slate-200 dark:bg-slate-700 dark:text-white py-2 px-3 text-sm';btn.innerText=label;btn.onclick=()=>{close();onClick();};return btn;};const close=()=>backdrop.remove();buttons.appendChild(mkBtn('画像を添付',()=>dom.imageUploadInput?.click()));buttons.appendChild(mkBtn('ファイルを添付（テキスト抽出）',()=>dom.fileUploadInput?.click()));const cancel=mkBtn('キャンセル',()=>{});cancel.className='w-full rounded-lg bg-slate-100 dark:bg-slate-600 dark:text-white py-2 px-3 text-sm';panel.appendChild(title);panel.appendChild(buttons);panel.appendChild(cancel);backdrop.appendChild(panel);backdrop.addEventListener('click',(event)=>{if(event.target===backdrop)close();});document.body.appendChild(backdrop);}
 function closeAllItemMenus(){document.querySelectorAll('.item-menu.is-open').forEach((menu)=>menu.classList.remove('is-open'));}
 async function startNewSession({ systemPrompt = '', activePersonaId = null } = {}){const id=crypto.randomUUID();state.settings.systemPrompt=systemPrompt;state.ui.activePersonaId=activePersonaId;saveSettings();state.sessions.unshift({id,title:`会話 ${new Date().toLocaleString('ja-JP')}`,messages:[],systemPrompt,overrides:createSessionOverrides({systemPrompt})});state.activeSessionId=id;await persistState();renderHistory();renderSessionList();renderPersonaTabs();}
 function renderHistory(){chatArea.innerHTML='';const session=getActiveSession();if(!session||session.messages.length===0){addBubble('ようこそ、白い写本へ。','ai',null,false);updateScrollToBottomButtonVisibility();return;}session.messages.forEach((item,index)=>addBubble(item.text,item.role,index,true,item.attachments||[]));updateScrollToBottomButtonVisibility();}
@@ -421,14 +427,16 @@ const customRows=customPresets.sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)).map((p
 const sessionRows=[...state.sessions].sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)).filter((s)=>!historySearchKeyword||s.title.toLowerCase().includes(historySearchKeyword)).map((s)=>{const row=document.createElement('div');row.className='persona-row';const btn=document.createElement('button');btn.className='persona-tab-btn';btn.innerText=`${s.pinned?'📌 ':''}${s.title}`;btn.onclick=()=>{closeAllItemMenus();state.activeSessionId=s.id;persistState();renderHistory();closeSystemPresetPanel();};row.appendChild(btn);addMenu(row,[{label:'名前を編集',action:async()=>renameSessionById(s.id)},{label:s.pinned?'ピン留め解除':'ピン留め',action:async()=>{const t=state.sessions.find((x)=>x.id===s.id);if(!t)return;t.pinned=!t.pinned;await persistState();renderPersonaTabs();}},{label:'会話設定を編集',action:async()=>openSessionConfigEditor(s.id)},{label:'削除',action:async()=>deleteSessionById(s.id)},{label:'JSファイルから履歴読込',action:async()=>importSessionsFromJsFile()}]);return row;});
 mkSection('カスタムプリセット',customRows);mkSection('チャット履歴',sessionRows);}
 function applyPersona(persona){if(!persona)return;closeAllItemMenus();state.settings={...state.settings,...persona.settings};state.ui.activePersonaId=persona.id;applySettingsToUI();saveSettings();renderPersonaTabs();}
-function getAiSettingsDraftFromUI(){const provider=dom.provider?.value||state.settings.provider;const model=dom.model?.value||'';const next={provider,geminiModel:state.settings.geminiModel,openaiModel:state.settings.openaiModel,systemPrompt:dom.systemPrompt?.value??state.settings.systemPrompt,temperature:Number(dom.temperature?.value??state.settings.temperature),maxTokens:Number(dom.maxTokens?.value??state.settings.maxTokens)};if(provider==='gemini'&&model)next.geminiModel=model;if(provider==='openai'&&model)next.openaiModel=model;return next;}
+function getAiSettingsDraftFromUI(){syncGlobalAiSettingsFromUI();const provider=state.settings.provider;const model=dom.model?.value||'';const next={provider,geminiModel:state.settings.geminiModel,openaiModel:state.settings.openaiModel,systemPrompt:state.settings.systemPrompt,temperature:state.settings.temperature,maxTokens:state.settings.maxTokens};if(provider==='gemini'&&model)next.geminiModel=model;if(provider==='openai'&&model)next.openaiModel=model;return next;}
 async function savePersona(){const name=document.getElementById('persona-name').value.trim();if(!name)return;state.personas.push({name,settings:{...state.settings,...getAiSettingsDraftFromUI()}});await persistState();renderPersonaTabs();document.getElementById('persona-name').value='';}
 async function deletePersona(persona){if(!persona||!window.confirm(`プリセット「${persona.name}」を削除しますか？`))return;if(persona.isSystem)state.hiddenSystemPersonaIds.push(persona.id);else if(typeof persona.customIndex==='number')state.personas.splice(persona.customIndex,1);await persistState();renderPersonaTabs();}
 function renderSessionList(){const list=document.getElementById('session-list');list.innerHTML='';state.sessions.forEach((s)=>{const row=document.createElement('div');row.className='flex items-center gap-2';const btn=document.createElement('button');btn.className='flex-1 text-left p-2 rounded border dark:text-white';btn.innerText=s.title;btn.onclick=()=>{state.activeSessionId=s.id;persistState();renderHistory();toggleHistoryPanel();};const edit=document.createElement('button');edit.className='px-2 py-1 rounded bg-amber-600 text-white text-sm';edit.innerText='✏️';edit.setAttribute('aria-label',`会話「${s.title}」の名前を編集`);edit.onclick=()=>renameSessionById(s.id);const del=document.createElement('button');del.className='px-2 py-1 rounded bg-rose-700 text-white text-sm font-bold';del.innerText='×';del.setAttribute('aria-label',`会話「${s.title}」を削除`);del.onclick=()=>deleteSessionById(s.id);row.appendChild(btn);row.appendChild(edit);row.appendChild(del);list.appendChild(row);});}
 function saveSettings(){Object.entries({[STORAGE_KEYS.provider]:state.settings.provider,[STORAGE_KEYS.geminiModel]:state.settings.geminiModel,[STORAGE_KEYS.openaiModel]:state.settings.openaiModel,[STORAGE_KEYS.googleClientId]:state.settings.googleClientId,[STORAGE_KEYS.driveFolderName]:state.settings.driveFolderName,[STORAGE_KEYS.driveFileName]:state.settings.driveFileName,[STORAGE_KEYS.systemPrompt]:state.settings.systemPrompt,[STORAGE_KEYS.userSignature]:state.settings.userSignature,[STORAGE_KEYS.temperature]:state.settings.temperature,[STORAGE_KEYS.maxTokens]:state.settings.maxTokens,[STORAGE_KEYS.rememberApiKeys]:state.settings.rememberApiKeys,[STORAGE_KEYS.rememberGoogleLogin]:state.settings.rememberGoogleLogin}).forEach(([k,v])=>localStorage.setItem(k,v));sessionStorage.setItem(STORAGE_KEYS.geminiKey,state.settings.geminiKey);sessionStorage.setItem(STORAGE_KEYS.openaiKey,state.settings.openaiKey);if(state.settings.rememberApiKeys){localStorage.setItem(STORAGE_KEYS.geminiKey,state.settings.geminiKey);localStorage.setItem(STORAGE_KEYS.openaiKey,state.settings.openaiKey);}else{localStorage.removeItem(STORAGE_KEYS.geminiKey);localStorage.removeItem(STORAGE_KEYS.openaiKey);}}
 function applySettingsToUI(){syncContextSliderLimit();dom.provider.value=state.settings.provider;renderModelOptions();dom.geminiKey.value=state.settings.geminiKey;dom.openaiKey.value=state.settings.openaiKey;dom.rememberApiKeys.checked=state.settings.rememberApiKeys;dom.rememberGoogleLogin.checked=state.settings.rememberGoogleLogin;dom.googleClientId.value=state.settings.googleClientId;dom.driveFolderName.value=state.settings.driveFolderName;dom.driveFileName.value=state.settings.driveFileName;dom.systemPrompt.value=state.settings.systemPrompt;dom.userSignature.value=state.settings.userSignature;dom.temperature.value=state.settings.temperature;dom.temperatureValue.innerText=state.settings.temperature;dom.maxTokens.value=state.settings.maxTokens;dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}
-function getEffectiveSettings(){const session=getActiveSession();const overrides=getSessionOverrides(session);const provider=overrides.provider||state.settings.provider;const systemPrompt=typeof overrides.systemPrompt==='string'?overrides.systemPrompt:(typeof session?.systemPrompt==='string'?session.systemPrompt:(typeof dom.systemPrompt?.value==='string'?dom.systemPrompt.value:state.settings.systemPrompt));const geminiModel=overrides.geminiModel||state.settings.geminiModel;const openaiModel=overrides.openaiModel||state.settings.openaiModel;const temperature=Number.isFinite(overrides.temperature)?overrides.temperature:state.settings.temperature;const maxTokens=Number.isFinite(overrides.maxTokens)?overrides.maxTokens:state.settings.maxTokens;const userSignature=session?.userSignature||state.settings.userSignature;return {...state.settings,provider,geminiModel,openaiModel,temperature,maxTokens,systemPrompt,userSignature};}
-function bindSettings(){const {provider,model,geminiKey,openaiKey,rememberApiKeys,rememberGoogleLogin,googleClientId,driveFolderName,driveFileName,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{syncContextSliderLimit();renderModelOptions();};model.onchange=()=>{};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};rememberApiKeys.onchange=()=>{state.settings.rememberApiKeys=rememberApiKeys.checked;saveSettings();};rememberGoogleLogin.onchange=()=>{state.settings.rememberGoogleLogin=rememberGoogleLogin.checked;saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};driveFolderName.onchange=()=>{state.settings.driveFolderName=driveFolderName.value.trim()||DEFAULT_DRIVE_FOLDER_NAME;driveSync.folderId=null;driveSync.fileId=null;saveSettings();};driveFileName.onchange=()=>{state.settings.driveFileName=driveFileName.value.trim()||DEFAULT_DRIVE_FILE_NAME;driveSync.fileId=null;saveSettings();};systemPrompt.oninput=()=>{};systemPrompt.onchange=()=>{};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{dom.temperatureValue.innerText=temperature.value;};maxTokens.oninput=()=>{dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;};clearSystemPromptBtn.onclick=()=>{systemPrompt.value='';};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(!state.settings.rememberGoogleLogin);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${getErrorMessage(e)}`);}};googleLogoutBtn.onclick=async()=>{try{state.settings.rememberGoogleLogin=false;saveSettings();if(dom.rememberGoogleLogin)dom.rememberGoogleLogin.checked=false;await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${getErrorMessage(e)}`);}};}
+function clampMaxTokensToProviderLimit(provider=state.settings.provider){const limit=CONTEXT_LIMITS[provider]||8192;let next=Number(state.settings.maxTokens);if(!Number.isFinite(next))next=limit;next=Math.min(Math.max(next,256),limit);if(next!==state.settings.maxTokens)state.settings.maxTokens=next;if(dom.maxTokens){dom.maxTokens.max=String(limit);if(Number(dom.maxTokens.value)>limit)dom.maxTokens.value=String(limit);dom.maxTokensValue.innerText=`${state.settings.maxTokens} / ${dom.maxTokens.max}`;}return next;}
+function syncGlobalAiSettingsFromUI(){if(!dom.provider||!dom.model)return;const provider=dom.provider.value||state.settings.provider;state.settings.provider=provider;const model=dom.model.value||'';if(provider==='gemini'){state.settings.geminiModel=model||state.settings.geminiModel;}else if(provider==='openai'){state.settings.openaiModel=model||state.settings.openaiModel;}if(dom.systemPrompt)state.settings.systemPrompt=dom.systemPrompt.value;const temp=Number(dom.temperature?.value);if(Number.isFinite(temp))state.settings.temperature=temp;const maxTok=Number(dom.maxTokens?.value);if(Number.isFinite(maxTok))state.settings.maxTokens=maxTok;clampMaxTokensToProviderLimit(provider);saveSettings();}
+function getEffectiveSettings(){syncGlobalAiSettingsFromUI();const session=getActiveSession();const overrides=getSessionOverrides(session);const provider=overrides.provider||state.settings.provider;const systemPrompt=typeof overrides.systemPrompt==='string'?overrides.systemPrompt:(typeof session?.systemPrompt==='string'?session.systemPrompt:state.settings.systemPrompt);const geminiModel=overrides.geminiModel||state.settings.geminiModel;const openaiModel=overrides.openaiModel||state.settings.openaiModel;const temperature=Number.isFinite(overrides.temperature)?overrides.temperature:state.settings.temperature;const maxTokens=Number.isFinite(overrides.maxTokens)?overrides.maxTokens:state.settings.maxTokens;const userSignature=session?.userSignature||state.settings.userSignature;return {...state.settings,provider,geminiModel,openaiModel,temperature,maxTokens,systemPrompt,userSignature};}
+function bindSettings(){const {provider,model,geminiKey,openaiKey,rememberApiKeys,rememberGoogleLogin,googleClientId,driveFolderName,driveFileName,systemPrompt,userSignature,temperature,maxTokens,clearSystemPromptBtn,systemPresetToggle,googleLoginBtn,googleLogoutBtn}=dom;provider.onchange=()=>{state.settings.provider=provider.value||state.settings.provider;syncContextSliderLimit();renderModelOptions();syncGlobalAiSettingsFromUI();};model.onchange=()=>{syncGlobalAiSettingsFromUI();};geminiKey.onchange=()=>{state.settings.geminiKey=geminiKey.value.trim();saveSettings();};openaiKey.onchange=()=>{state.settings.openaiKey=openaiKey.value.trim();saveSettings();};rememberApiKeys.onchange=()=>{state.settings.rememberApiKeys=rememberApiKeys.checked;saveSettings();};rememberGoogleLogin.onchange=()=>{state.settings.rememberGoogleLogin=rememberGoogleLogin.checked;saveSettings();};googleClientId.onchange=()=>{state.settings.googleClientId=googleClientId.value.trim();driveSync.tokenClient=null;saveSettings();};driveFolderName.onchange=()=>{state.settings.driveFolderName=driveFolderName.value.trim()||DEFAULT_DRIVE_FOLDER_NAME;driveSync.folderId=null;driveSync.fileId=null;saveSettings();};driveFileName.onchange=()=>{state.settings.driveFileName=driveFileName.value.trim()||DEFAULT_DRIVE_FILE_NAME;driveSync.fileId=null;saveSettings();};systemPrompt.oninput=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};systemPrompt.onchange=()=>{state.settings.systemPrompt=systemPrompt.value;saveSettings();};userSignature.onchange=()=>{state.settings.userSignature=userSignature.value.trim()||'Blanche';saveSettings();renderHistory();};temperature.oninput=()=>{dom.temperatureValue.innerText=temperature.value;state.settings.temperature=Number(temperature.value);saveSettings();};maxTokens.oninput=()=>{dom.maxTokensValue.innerText=`${maxTokens.value} / ${maxTokens.max}`;state.settings.maxTokens=Number(maxTokens.value);clampMaxTokensToProviderLimit(state.settings.provider);saveSettings();};clearSystemPromptBtn.onclick=()=>{systemPrompt.value='';state.settings.systemPrompt='';saveSettings();};systemPresetToggle.onclick=()=>{state.ui.showSystemPresetPanel=!state.ui.showSystemPresetPanel;renderSystemPresetPanel();};googleLoginBtn.onclick=async()=>{try{await driveSync.signIn(!state.settings.rememberGoogleLogin);await driveSync.pull();}catch(e){driveSync.setStatus(`Drive接続失敗: ${getErrorMessage(e)}`);}};googleLogoutBtn.onclick=async()=>{try{state.settings.rememberGoogleLogin=false;saveSettings();if(dom.rememberGoogleLogin)dom.rememberGoogleLogin.checked=false;await driveSync.signOut();}catch(e){driveSync.setStatus(`Drive接続解除失敗: ${getErrorMessage(e)}`);}};}
 
 function closeSystemPresetPanel(){state.ui.showSystemPresetPanel=false;renderSystemPresetPanel();}
 function renderSystemPresetPanel(){const p=document.getElementById('system-preset-panel');const t=document.getElementById('system-preset-toggle');const b=document.getElementById('system-preset-backdrop');p.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.classList.toggle('is-open',state.ui.showSystemPresetPanel);b?.classList.toggle('is-open',state.ui.showSystemPresetPanel);t.setAttribute('aria-expanded',state.ui.showSystemPresetPanel?'true':'false');}
@@ -465,6 +473,195 @@ async function createImageAttachments(files) {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
   return attachments;
+}
+
+function isLikelyTextFile(file) {
+  const mime = String(file?.type || '').toLowerCase();
+  if (mime.startsWith('text/')) return true;
+  if (mime.includes('json') || mime.includes('xml') || mime.includes('yaml') || mime.includes('csv') || mime.includes('javascript') || mime.includes('typescript')) return true;
+  const name = String(file?.name || '');
+  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  return TEXT_FILE_EXTENSIONS.has(ext);
+}
+
+function sanitizeFileText(text = '') {
+  return String(text).replace(/\r\n/g, '\n').replace(/\u0000/g, '');
+}
+
+function getFileExtension(name = '') {
+  if (!name.includes('.')) return '';
+  return name.split('.').pop().toLowerCase();
+}
+
+async function extractPdfText(file) {
+  if (!window.pdfjsLib?.getDocument) {
+    throw new Error('pdf_parser_unavailable');
+  }
+  if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const buffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+  const pageLimit = Math.min(pdf.numPages, MAX_PDF_PAGES);
+  const pages = [];
+  for (let i = 1; i <= pageLimit; i += 1) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const line = (content.items || [])
+      .map((item) => (typeof item.str === 'string' ? item.str : ''))
+      .join(' ')
+      .trim();
+    if (line) pages.push(line);
+  }
+  const full = pages.join('\n');
+  const truncatedByPages = pdf.numPages > pageLimit;
+  return { text: full, truncatedByPages };
+}
+
+async function extractDocxText(file) {
+  if (!window.mammoth?.extractRawText) {
+    throw new Error('docx_parser_unavailable');
+  }
+  const buffer = await file.arrayBuffer();
+  const result = await window.mammoth.extractRawText({ arrayBuffer: buffer });
+  return { text: result?.value || '' };
+}
+
+async function extractTextFromFile(file) {
+  const ext = getFileExtension(String(file?.name || ''));
+  if (ext === 'pdf') {
+    const result = await extractPdfText(file);
+    return { ...result, source: 'pdf' };
+  }
+  if (ext === 'docx') {
+    const result = await extractDocxText(file);
+    return { ...result, source: 'docx' };
+  }
+  const raw = await file.text();
+  return { text: raw, source: 'plain' };
+}
+
+function chunkTextForPrompt(text = '', chunkSize = MAX_FILE_CHUNK_CHARS) {
+  const normalized = sanitizeFileText(text);
+  if (!normalized) return [];
+  const chunks = [];
+  for (let i = 0; i < normalized.length; i += chunkSize) {
+    chunks.push(normalized.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
+function formatFileContentReason(reason = '') {
+  if (reason === 'unsupported_type') return '非対応形式';
+  if (reason === 'too_large') return 'サイズ超過';
+  if (reason === 'budget_exceeded') return '合計上限超過';
+  if (reason === 'pdf_parser_unavailable') return 'PDF抽出ライブラリ未読込';
+  if (reason === 'docx_parser_unavailable') return 'DOCX抽出ライブラリ未読込';
+  if (reason === 'read_error') return '読み込み失敗';
+  if (reason === 'empty') return '空ファイル';
+  return '内容なし';
+}
+
+async function createFileAttachments(files) {
+  const attachments = [];
+  let remainingChars = MAX_FILE_TOTAL_TEXT_CHARS;
+  for (const file of files) {
+    const next = { name: file.name, mimeType: file.type || 'application/octet-stream', size: Number(file.size) || 0, content: '', chunks: [], contentAvailable: false, contentTruncated: false, contentReason: '', source: '' };
+    if (!isLikelyTextFile(file)) {
+      const ext = getFileExtension(String(file.name || ''));
+      if (ext !== 'pdf' && ext !== 'docx') {
+        next.contentReason = 'unsupported_type';
+        attachments.push(next);
+        continue;
+      }
+    }
+    if (next.size > MAX_FILE_TEXT_BYTES) {
+      next.contentReason = 'too_large';
+      attachments.push(next);
+      continue;
+    }
+    if (remainingChars <= 0) {
+      next.contentReason = 'budget_exceeded';
+      attachments.push(next);
+      continue;
+    }
+    try {
+      const extracted = await extractTextFromFile(file);
+      next.source = extracted.source || '';
+      const normalized = sanitizeFileText(extracted.text || '');
+      const budget = Math.min(MAX_FILE_TEXT_CHARS_PER_FILE, remainingChars);
+      const trimmed = normalized.slice(0, budget);
+      next.content = trimmed;
+      next.chunks = chunkTextForPrompt(trimmed);
+      next.contentAvailable = trimmed.length > 0;
+      next.contentTruncated = normalized.length > trimmed.length || Boolean(extracted.truncatedByPages);
+      next.contentReason = next.contentAvailable ? '' : 'empty';
+      if (next.contentAvailable) remainingChars -= trimmed.length;
+    } catch (error) {
+      const reason = typeof error?.message === 'string' ? error.message : '';
+      if (reason === 'pdf_parser_unavailable' || reason === 'docx_parser_unavailable') {
+        next.contentReason = reason;
+      } else {
+        next.contentReason = 'read_error';
+      }
+    }
+    attachments.push(next);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  return attachments;
+}
+
+function buildFileContentNote(attachments = []) {
+  if (!attachments.length) return '';
+  const blocks = attachments.map((attachment, index) => {
+    const title = `### file_${index + 1}: ${attachment.name} (${attachment.mimeType || 'unknown'})`;
+    if (attachment.contentAvailable) {
+      const chunked = Array.isArray(attachment.chunks) && attachment.chunks.length
+        ? attachment.chunks.map((chunk, chunkIndex) => `#### part ${chunkIndex + 1}/${attachment.chunks.length}\n\`\`\`\n${chunk}\n\`\`\``).join('\n')
+        : `\`\`\`\n${attachment.content}\n\`\`\``;
+      const suffix = attachment.contentTruncated ? '\n[...truncated for web performance...]' : '';
+      return `${title}\n${chunked}${suffix}`;
+    }
+    const reason = formatFileContentReason(attachment.contentReason || '');
+    return `${title}\n（本文を添付できませんでした: ${reason}）`;
+  });
+  return `[添付ファイル内容]\n${blocks.join('\n\n')}`;
+}
+
+function renderFilePreview() {
+  const wrap = document.getElementById('file-preview-wrap');
+  const list = document.getElementById('file-preview-list');
+  if (!wrap || !list) return;
+  if (!selectedFileAttachments.length) {
+    wrap.classList.add('hidden');
+    list.innerHTML = '';
+    syncComposerGrowOffset();
+    return;
+  }
+  wrap.classList.remove('hidden');
+  list.innerHTML = '';
+  selectedFileAttachments.forEach((attachment, index) => {
+    const item = document.createElement('div');
+    item.className = 'file-preview-item';
+    const label = document.createElement('div');
+    label.className = 'file-preview-label';
+    const status = attachment.contentAvailable
+      ? (attachment.contentTruncated ? '本文(一部)' : '本文')
+      : `本文なし:${formatFileContentReason(attachment.contentReason || '')}`;
+    label.innerText = `${attachment.name} (${status})`;
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'file-preview-remove-btn';
+    removeBtn.textContent = '×';
+    removeBtn.setAttribute('aria-label', `${attachment.name} を削除`);
+    removeBtn.onclick = () => {
+      selectedFileAttachments.splice(index, 1);
+      renderFilePreview();
+    };
+    item.append(label, removeBtn);
+    list.appendChild(item);
+  });
+  syncComposerGrowOffset();
 }
 
 function renderImagePreview() {
@@ -513,6 +710,11 @@ function clearSelectedImageAttachment() {
   renderImagePreview();
 }
 
+function clearSelectedFileAttachments() {
+  selectedFileAttachments = [];
+  renderFilePreview();
+}
+
 async function requestWakeLockIfAvailable() {
   if (!('wakeLock' in navigator)) return false;
   try {
@@ -542,7 +744,7 @@ function buildApiMessages(messages = []) {
 
   return source.map((message) => {
     if (!Array.isArray(message?.attachments) || !message.attachments.length) return message;
-    if (remainingAttachmentMessages <= 0 || remainingImageAttachments <= 0) {
+    if (remainingAttachmentMessages <= 0) {
       return { ...message, attachments: [] };
     }
 
@@ -589,10 +791,13 @@ async function handleSend(){
   let hasStreamStarted=false;
 
   try{
-    const outgoing={role:'user',text};
+    const fileNote = buildFileContentNote(selectedFileAttachments);
+    const mergedText=[text,fileNote].filter(Boolean).join('\n\n');
+    const outgoingText=mergedText.trim()||(selectedImageAttachments.length?'(添付のみ)':'');
+    const outgoing={role:'user',text:outgoingText};
     const attachments=[];
     if(selectedImageAttachments.length){attachments.push(...selectedImageAttachments.map((attachment)=>({type:'image',mimeType:attachment.mimeType,dataUrl:attachment.dataUrl,name:attachment.file.name})));}
-    if(selectedFileAttachments.length){attachments.push(...selectedFileAttachments.map((attachment)=>({type:'file',mimeType:attachment.mimeType,name:attachment.name})));}
+    if(selectedFileAttachments.length){attachments.push(...selectedFileAttachments.map((attachment)=>({type:'file',mimeType:attachment.mimeType,name:attachment.name,size:attachment.size||0,contentIncluded:Boolean(attachment.contentAvailable)})));}
     if(attachments.length){outgoing.attachments=attachments;}
 
     s.messages.push(outgoing);
@@ -601,7 +806,7 @@ async function handleSend(){
     userInput.value='';
     userInput.dispatchEvent(new Event('input'));
     clearSelectedImageAttachment();
-    selectedFileAttachments=[];
+    clearSelectedFileAttachments();
 
     loading=addBubble(`思索中...
 ${BACKGROUND_WARNING_TEXT}`,'ai');
@@ -628,7 +833,7 @@ ${BACKGROUND_WARNING_TEXT}`,'ai');
     await persistState();
     renderHistory();
   }catch(e){
-    console.error('[stream][send] request failed',{provider,errorName:e?.name,errorMessage:e?.message,streamedReplyLength:streamedReply.length});
+    console.error('[stream][send] リクエスト失敗',{provider,errorName:e?.name,errorMessage:e?.message,streamedReplyLength:streamedReply.length});
     if(loading?.div){
       if(e?.name==='AbortError'){loading.div.innerText=streamedReply||'生成を中断しました。';}
       else{const detail=`
@@ -709,13 +914,15 @@ function syncComposerGrowOffset() {
   const baseHeight = lineHeight + paddingTop + paddingBottom;
   const growOffset = Math.max(0, userInput.offsetHeight - baseHeight);
 
-  const previewWrap = document.getElementById('image-preview-wrap');
+  const previewCandidates = ['image-preview-wrap', 'file-preview-wrap'];
   let previewOffset = 0;
-  if (previewWrap && !previewWrap.classList.contains('hidden')) {
-    const previewStyle = window.getComputedStyle(previewWrap);
-    const marginBottom = Number.parseFloat(previewStyle.marginBottom) || 0;
-    previewOffset = previewWrap.offsetHeight + marginBottom;
-  }
+  previewCandidates.forEach((id) => {
+    const wrap = document.getElementById(id);
+    if (!wrap || wrap.classList.contains('hidden')) return;
+    const style = window.getComputedStyle(wrap);
+    const marginBottom = Number.parseFloat(style.marginBottom) || 0;
+    previewOffset += wrap.offsetHeight + marginBottom;
+  });
 
   document.documentElement.style.setProperty('--composer-grow-offset', `${growOffset}px`);
   document.documentElement.style.setProperty('--composer-preview-offset', `${previewOffset}px`);
@@ -742,7 +949,7 @@ window.addEventListener('DOMContentLoaded', async () => { Object.assign(dom, app
   dom.scrollToBottomBtn?.addEventListener('click', scrollChatToBottom);
   dom.attachMenuBtn?.addEventListener('click',openAttachTypeSelector);
   dom.imageUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;try{const acceptedCount=ensureAttachmentCapacity(files.length);if(!acceptedCount)return;const attachments=await createImageAttachments(files.slice(0,acceptedCount));selectedImageAttachments=[...selectedImageAttachments,...attachments];renderImagePreview();}catch(err){window.alert(`画像の添付に失敗しました: ${getErrorMessage(err)}`);}finally{if(e?.target)e.target.value='';}});
-  dom.fileUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;const acceptedCount=ensureAttachmentCapacity(files.length);if(!acceptedCount){if(e?.target)e.target.value='';return;}const acceptedFiles=files.slice(0,acceptedCount);selectedFileAttachments=[...selectedFileAttachments,...acceptedFiles.map((file)=>({name:file.name,mimeType:file.type||'application/octet-stream'}))];injectSelectedFileToInput(acceptedFiles[0],'file');if(e?.target)e.target.value='';});
+  dom.fileUploadInput?.addEventListener('change',async (e)=>{const files=Array.from(e?.target?.files||[]);if(!files.length)return;const acceptedCount=ensureAttachmentCapacity(files.length);if(!acceptedCount){if(e?.target)e.target.value='';return;}const acceptedFiles=files.slice(0,acceptedCount);try{const extracted=await createFileAttachments(acceptedFiles);selectedFileAttachments=[...selectedFileAttachments,...extracted];renderFilePreview();const omitted=extracted.filter((item)=>!item.contentAvailable).length;if(omitted>0){window.alert(`一部ファイルは内容抽出できず、メタ情報のみ送信されます（${omitted}件）。`);}injectSelectedFileToInput(acceptedFiles[0],'file');}catch(err){window.alert(`ファイル抽出に失敗しました: ${getErrorMessage(err)}`);}if(e?.target)e.target.value='';});
   dom.chatImportInput?.addEventListener('change',handleChatImportInputChange);
   dom.conversationJsonPickBtn?.addEventListener('click', handleConversationJsonPick);
   dom.conversationJsonInput?.addEventListener('change', handleConversationJsonInputChange);
