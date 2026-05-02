@@ -133,7 +133,7 @@ function renderDevLogs() {
 }
 
 function installConsoleLogHook() {
-  ['log', 'warn', 'error'].forEach((level) => {
+  ['log', 'info', 'warn', 'error'].forEach((level) => {
     const original = console[level].bind(console);
     console[level] = (...args) => {
       try {
@@ -143,6 +143,20 @@ function installConsoleLogHook() {
       }
       original(...args);
     };
+  });
+
+  window.addEventListener('error', (event) => {
+    appendDevLog('WINDOW_ERROR', [
+      event?.message || 'window error',
+      event?.filename || '',
+      typeof event?.lineno === 'number' ? `line:${event.lineno}` : '',
+      typeof event?.colno === 'number' ? `col:${event.colno}` : '',
+    ]);
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event?.reason;
+    const message = reason instanceof Error ? (reason.stack || reason.message) : String(reason || 'unknown rejection');
+    appendDevLog('UNHANDLED_REJECTION', [message]);
   });
 }
 
