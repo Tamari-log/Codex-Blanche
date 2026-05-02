@@ -26,6 +26,12 @@ function normalizeGeminiContents(messages) {
 async function callGeminiAPI(messages, apiKey, options = {}) {
   const model = options.model || 'gemini-3.1-pro-preview';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const hasOnChunk = typeof options.onChunk === 'function';
+  console.info('[stream][gemini][req] start', {
+    model,
+    hasOnChunk,
+    messageCount: Array.isArray(messages) ? messages.length : 0,
+  });
 
   const systemMessage = options.systemInstruction
     || messages.find((msg) => msg.role === 'system')?.text
@@ -55,6 +61,12 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     },
     body: JSON.stringify(body),
   });
+  console.info('[stream][gemini][req] response', {
+    status: response.status,
+    ok: response.ok,
+    contentType: response.headers.get('content-type'),
+    hasBody: !!response.body,
+  });
 
   if (!response.ok) {
     let detail = '';
@@ -67,6 +79,10 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     throw new Error(`Gemini API request failed (${response.status}): ${detail}`);
   }
   const data = await response.json();
+  console.info('[stream][gemini][res] parsed', {
+    hasCandidates: Array.isArray(data?.candidates),
+    candidateCount: Array.isArray(data?.candidates) ? data.candidates.length : 0,
+  });
   const firstCandidate = data.candidates?.[0];
   if (firstCandidate?.finishReason === 'SAFETY') {
     throw new Error('SAFETY_REFUSAL: Gemini safety filter blocked the response');
