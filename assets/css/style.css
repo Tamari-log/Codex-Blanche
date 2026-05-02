@@ -528,3 +528,41 @@ body { font-family: 'Noto Serif JP', serif; }
     border-color: rgba(148, 163, 184, 0.6);
     box-shadow: 0 8px 20px rgba(2, 6, 23, 0.45);
 }
+
+.image-preview-list {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+}
+
+.image-preview-item {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.image-preview-thumb {
+    width: 3.5rem;
+    height: 3.5rem;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(148, 163, 184, 0.6);
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.image-preview-remove-btn {
+    position: absolute;
+    top: -0.3rem;
+    right: -0.3rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
