@@ -24,7 +24,13 @@ function renderMarkdownText(text = '') {
     let line = escapeHtml(value);
     line = line.replace(/!\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, '<img alt="$1" src="$2">');
     line = line.replace(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-    line = line.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+    line = line
+      .split(/(<[^>]+>)/g)
+      .map((segment) => {
+        if (segment.startsWith('<')) return segment;
+        return segment.replace(/(^|[\s(])(https?:\/\/[^\s<)"']+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+      })
+      .join('');
     line = line.replace(/`([^`]+)`/g, '<code>$1</code>');
     line = line.replace(/~~(.*?)~~/g, '<del>$1</del>');
     line = line.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
@@ -82,10 +88,16 @@ function renderMarkdownText(text = '') {
       closeListIfNeeded();
       const headerCells = parseTableCells(line).map((cell) => applyInlineMarkdown(cell));
       const alignCells = parseTableCells(next).map(alignmentForCell);
+      if (headerCells.length < 2 || alignCells.length !== headerCells.length) {
+        out.push(trimmed ? `<p>${applyInlineMarkdown(line)}</p>` : '');
+        continue;
+      }
       const bodyRows = [];
       i += 2;
       while (i < lines.length && lines[i].includes('|')) {
-        const rowCells = parseTableCells(lines[i]).map((cell) => applyInlineMarkdown(cell));
+        const rawCells = parseTableCells(lines[i]);
+        if (rawCells.length !== headerCells.length || isTableSeparatorLine(lines[i])) break;
+        const rowCells = rawCells.map((cell) => applyInlineMarkdown(cell));
         if (!rowCells.length) break;
         bodyRows.push(rowCells);
         i += 1;

@@ -34,6 +34,11 @@
     renderSpeed: 'normal',
   };
 
+  const CONTEXT_LIMITS = {
+    gemini: 15000,
+    openai: 5000,
+  };
+
   const MODEL_OPTIONS = {
     gemini: [
       { value: 'gemini-3-flash-preview', label: 'gemini 3 flash（高速）' },
@@ -67,5 +72,5 @@
     };
   }
 
-  global.appSettings = { STORAGE_KEYS, DEFAULT_SETTINGS, MODEL_OPTIONS, createInitialSettings };
+  global.appSettings = { STORAGE_KEYS, DEFAULT_SETTINGS, MODEL_OPTIONS, CONTEXT_LIMITS, createInitialSettings };
 })(window);
