@@ -34,8 +34,7 @@ function normalizeGeminiContents(messages) {
 async function callGeminiAPI(messages, apiKey, options = {}) {
   const model = options.model || 'gemini-3.1-pro-preview';
   const hasOnChunk = typeof options.onChunk === 'function';
-  const endpoint = hasOnChunk ? 'streamGenerateContent?alt=sse' : 'generateContent';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContentStream?alt=sse`;
   console.info('[stream][gemini][req] start', {
     model,
     hasOnChunk,
@@ -87,19 +86,6 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     }
     throw new Error(`Gemini API request failed (${response.status}): ${detail}`);
   }
-  if (!hasOnChunk) {
-    const data = await response.json();
-    console.info('[stream][gemini][res] parsed', {
-      hasCandidates: Array.isArray(data?.candidates),
-      candidateCount: Array.isArray(data?.candidates) ? data.candidates.length : 0,
-    });
-    const firstCandidate = data.candidates?.[0];
-    if (firstCandidate?.finishReason === 'SAFETY') {
-      throw new Error('SAFETY_REFUSAL: Gemini safety filter blocked the response');
-    }
-    return firstCandidate?.content?.parts?.[0]?.text || '応答を取得できませんでした。';
-  }
-
   if (!response.body) {
     throw new Error('Gemini API did not return a readable stream');
   }
@@ -110,6 +96,7 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
   let fullText = '';
 
   const flushEvent = (eventText) => {
+    const chunks = [];
     const lines = eventText.split(/\r?\n/);
     for (const line of lines) {
       const trimmed = line.trim();
@@ -128,23 +115,38 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
       }
       const delta = firstCandidate?.content?.parts?.map((part) => part?.text || '').join('') || '';
       if (!delta) continue;
-      fullText += delta;
-      options.onChunk(delta, fullText);
+      chunks.push(delta);
     }
+    return chunks;
   };
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split('\n\n');
-    buffer = events.pop() || '';
-    for (const eventText of events) {
-      flushEvent(eventText);
+  async function* streamGeminiChunks() {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+      for (const eventText of events) {
+        for (const delta of flushEvent(eventText)) {
+          yield delta;
+        }
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      for (const delta of flushEvent(buffer)) {
+        yield delta;
+      }
     }
   }
-  buffer += decoder.decode();
-  if (buffer.trim()) flushEvent(buffer);
+
+  for await (const chunkText of streamGeminiChunks()) {
+    fullText += chunkText;
+    if (hasOnChunk) {
+      options.onChunk(chunkText, fullText);
+    }
+  }
 
   console.info('[stream][gemini][res] parsed', {
     hasCandidates: fullText.length > 0,
