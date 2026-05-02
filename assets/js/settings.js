@@ -18,6 +18,7 @@
     temperature: 'temperature',
     maxTokens: 'max_tokens',
     userSignature: 'user_signature',
+    renderSpeed: 'render_speed',
     localUpdatedAt: 'codex_local_updated_at',
     lastRemoteModifiedAt: 'codex_last_remote_modified_at',
     deletedAt: 'codex_deleted_at',
@@ -30,6 +31,7 @@
     userSignature: 'Blanche',
     temperature: 0.7,
     maxTokens: 2048,
+    renderSpeed: 'normal',
   };
 
   const MODEL_OPTIONS = {
@@ -59,6 +61,7 @@
       userSignature: localStorage.getItem(STORAGE_KEYS.userSignature) || DEFAULT_SETTINGS.userSignature,
       temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || DEFAULT_SETTINGS.temperature),
       maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || DEFAULT_SETTINGS.maxTokens),
+      renderSpeed: localStorage.getItem(STORAGE_KEYS.renderSpeed) || DEFAULT_SETTINGS.renderSpeed,
       rememberApiKeys: localStorage.getItem(STORAGE_KEYS.rememberApiKeys) === 'true',
       rememberGoogleLogin: localStorage.getItem(STORAGE_KEYS.rememberGoogleLogin) === 'true',
     };

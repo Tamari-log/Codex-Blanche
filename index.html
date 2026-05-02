@@ -153,6 +153,14 @@
                     <div id="view-display" class="settings-view hidden space-y-3" data-view-title="表示設定">
                         <h3 class="settings-view-title">ライト / ダークモード</h3>
                         <button onclick="toggleDarkMode()" id="mode-toggle-btn" class="w-full p-3 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold dark:text-white settings-action-btn"></button>
+                        <h3 class="settings-view-title">文字の速さ</h3>
+                        <select id="render-speed" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white">
+                            <option value="batch">まとめて</option>
+                            <option value="slow">遅い</option>
+                            <option value="normal">普通</option>
+                            <option value="fast">早い</option>
+                            <option value="live">ライブストリーミング</option>
+                        </select>
                     </div>
 
                     <div id="view-advanced-root" class="settings-view hidden space-y-3" data-view-title="詳細設定">

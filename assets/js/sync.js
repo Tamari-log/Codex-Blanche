@@ -1,5 +1,22 @@
 function createDriveSync(deps) {
   const { state, dom, STORAGE_KEYS, DEFAULT_DRIVE_FOLDER_NAME, DEFAULT_DRIVE_FILE_NAME, DRIVE_SCOPE, TOMBSTONE_RETENTION_MS, CONFLICT_TIME_BUFFER_MS, getErrorMessage, startNewSession, persistState, renderHistory, renderSessionList, renderPersonaTabs } = deps;
+  function buildGoogleAuthErrorMessage(resp = {}) {
+    const code = String(resp?.error || '').trim();
+    const desc = String(resp?.error_description || '').trim();
+    const origin = (window?.location?.origin || '').trim();
+    const base = desc ? `${code}: ${desc}` : code;
+    if (code === 'invalid_request' || code === 'unauthorized_client') {
+      return `Google認証に失敗しました（${base || 'invalid_request'}）。Google Cloud Console の OAuth 設定で、現在のURLオリジン（${origin || 'unknown'}）を「承認済みの JavaScript 生成元」に追加してください。Client ID は「ウェブアプリ」種別を使用してください。`;
+    }
+    if (code === 'access_denied') {
+      return 'Google認証がキャンセルされました。Google接続を再実行してください。';
+    }
+    if (code === 'popup_closed_by_user') {
+      return 'Google認証ポップアップが閉じられました。もう一度お試しください。';
+    }
+    if (base) return `Google認証に失敗しました: ${base}`;
+    return 'Google認証に失敗しました。Google Cloud の OAuth 設定を確認してください。';
+  }
   return {
   tokenClient: null, accessToken: null, folderId: null, fileId: null,
   _initPromise: null,
@@ -76,7 +93,18 @@ function createDriveSync(deps) {
     await new Promise((resolve, reject) => {
       const prev = this.tokenClient.callback;
       this.tokenClient.callback = (resp) => {
-        if (resp?.error) { reject(new Error(getErrorMessage(resp))); return; }
+        if (resp?.error) {
+          if (resp.error === 'popup_failed_to_open') {
+            reject(new Error('Google認証ポップアップを開けませんでした。サイトのポップアップ許可設定を確認してください。'));
+            return;
+          }
+          if (!interactive && (resp.error === 'popup_closed_by_user' || resp.error === 'interaction_required' || resp.error === 'consent_required' || resp.error === 'login_required')) {
+            reject(new Error('Drive自動接続には再認証が必要です。設定から「Google接続」を押してください。'));
+            return;
+          }
+          reject(new Error(buildGoogleAuthErrorMessage(resp)));
+          return;
+        }
         this.accessToken = resp.access_token;
         gapi.client.setToken({ access_token: resp.access_token });
         this.setStatus('Drive: 接続済み');
