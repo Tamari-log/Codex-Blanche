@@ -116,7 +116,7 @@ function renderDevLogs() {
   }
   [...state.devLogs].reverse().forEach((entry) => {
     const li = document.createElement('li');
-    li.className = 'text-xs border rounded p-2 dark:text-white';
+    li.className = 'text-xs border rounded p-2 dark:text-white whitespace-pre-wrap break-words overflow-wrap-anywhere';
     li.innerText = `[${entry.level}] ${new Date(entry.at).toLocaleTimeString('ja-JP')} ${entry.text}`;
     dom.devLogList.appendChild(li);
   });
