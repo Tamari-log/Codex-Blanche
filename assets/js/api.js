@@ -4,9 +4,6 @@ function generateAssistantReply({ provider, messages, apiKey, settings, signal, 
     hasOnChunk: typeof onChunk === 'function',
   });
   if (provider === 'gemini') {
-    if (typeof onChunk === 'function') {
-      console.warn('[stream][api] onChunk was provided for gemini, but current provider implementation is non-streaming.');
-    }
     return callGeminiAPI(messages, apiKey, {
       model: settings.geminiModel,
       temperature: settings.temperature,

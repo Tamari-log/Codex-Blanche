@@ -25,8 +25,9 @@ function normalizeGeminiContents(messages) {
 
 async function callGeminiAPI(messages, apiKey, options = {}) {
   const model = options.model || 'gemini-3.1-pro-preview';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const hasOnChunk = typeof options.onChunk === 'function';
+  const endpoint = hasOnChunk ? 'streamGenerateContent?alt=sse' : 'generateContent';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}`;
   console.info('[stream][gemini][req] start', {
     model,
     hasOnChunk,
@@ -78,16 +79,70 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
     }
     throw new Error(`Gemini API request failed (${response.status}): ${detail}`);
   }
-  const data = await response.json();
-  console.info('[stream][gemini][res] parsed', {
-    hasCandidates: Array.isArray(data?.candidates),
-    candidateCount: Array.isArray(data?.candidates) ? data.candidates.length : 0,
-  });
-  const firstCandidate = data.candidates?.[0];
-  if (firstCandidate?.finishReason === 'SAFETY') {
-    throw new Error('SAFETY_REFUSAL: Gemini safety filter blocked the response');
+  if (!hasOnChunk) {
+    const data = await response.json();
+    console.info('[stream][gemini][res] parsed', {
+      hasCandidates: Array.isArray(data?.candidates),
+      candidateCount: Array.isArray(data?.candidates) ? data.candidates.length : 0,
+    });
+    const firstCandidate = data.candidates?.[0];
+    if (firstCandidate?.finishReason === 'SAFETY') {
+      throw new Error('SAFETY_REFUSAL: Gemini safety filter blocked the response');
+    }
+    return firstCandidate?.content?.parts?.[0]?.text || '応答を取得できませんでした。';
   }
-  return firstCandidate?.content?.parts?.[0]?.text || '応答を取得できませんでした。';
+
+  if (!response.body) {
+    throw new Error('Gemini API did not return a readable stream');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+
+  const flushEvent = (eventText) => {
+    const lines = eventText.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const raw = trimmed.slice(5).trim();
+      if (!raw || raw === '[DONE]') continue;
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      const firstCandidate = parsed?.candidates?.[0];
+      if (firstCandidate?.finishReason === 'SAFETY') {
+        throw new Error('SAFETY_REFUSAL: Gemini safety filter blocked the response');
+      }
+      const delta = firstCandidate?.content?.parts?.map((part) => part?.text || '').join('') || '';
+      if (!delta) continue;
+      fullText += delta;
+      options.onChunk(delta, fullText);
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+    for (const eventText of events) {
+      flushEvent(eventText);
+    }
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) flushEvent(buffer);
+
+  console.info('[stream][gemini][res] parsed', {
+    hasCandidates: fullText.length > 0,
+    candidateCount: fullText.length > 0 ? 1 : 0,
+  });
+  return fullText || '応答を取得できませんでした。';
 }
 
 async function callOpenAIAPI(messages, apiKey, options = {}) {
