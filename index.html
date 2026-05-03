@@ -90,6 +90,7 @@
                         <button class="settings-nav-card" data-settings-view="view-ai-root">カスタムプリセット作成</button>
                         <button class="settings-nav-card" data-settings-view="view-display">表示設定</button>
                         <button class="settings-nav-card" data-settings-view="view-advanced-root">詳細設定</button>
+                        <button class="settings-nav-card" data-settings-view="view-new-session-model">新規会話時のモデル設定</button>
                         <button onclick="startNewSession({ systemPrompt: '', activePersonaId: null }).then(()=>toggleSettings())" class="settings-nav-card">新しい会話を開始</button>
                         <button onclick="toggleSettings()" class="settings-nav-card settings-nav-card-secondary">書庫に戻る</button>
                     </div>
@@ -123,7 +124,16 @@
                         <button class="settings-nav-card" data-settings-view="view-ai-context">コンテキスト / 署名設定画面</button>
                         <input id="persona-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="保存するプリセット名">
                         <button onclick="savePersona()" class="w-full bg-indigo-600 text-white py-2 rounded-lg settings-action-btn">プリセット保存</button>
-                        
+                    </div>
+
+                    <div id="view-new-session-model" class="settings-view hidden space-y-3" data-view-title="新規会話時のモデル設定">
+                        <h3 class="settings-view-title">新規会話時のモデル設定</h3>
+                        <p class="text-xs text-slate-600 dark:text-slate-300">「新しい会話を開始」時に使うモデルを設定します。</p>
+                        <select id="new-session-provider" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white">
+                            <option value="gemini">Gemini</option>
+                            <option value="openai">ChatGPT (OpenAI)</option>
+                        </select>
+                        <select id="new-session-model" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white"></select>
                     </div>
 
                     <div id="view-ai-model" class="settings-view hidden space-y-3" data-view-title="モデル設定">
