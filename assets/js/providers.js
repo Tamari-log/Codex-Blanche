@@ -106,6 +106,7 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
 
   const body = { contents };
   if (Object.keys(generationConfig).length) body.generationConfig = generationConfig;
+  if (options.allowSearch) body.tools = [{ google_search: {} }];
   if (systemMessage) {
     body.system_instruction = { parts: [{ text: systemMessage }] };
   }
@@ -360,6 +361,7 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
         model,
         input,
         instructions: instructions || undefined,
+        tools: options.allowSearch ? [{ type: 'web_search_preview' }] : undefined,
         temperature: options.temperature,
         max_output_tokens: options.maxTokens,
       }),

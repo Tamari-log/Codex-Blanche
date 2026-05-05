@@ -122,6 +122,19 @@
                         <button class="settings-nav-card" data-settings-view="view-ai-model">モデル設定</button>
                         <button class="settings-nav-card" data-settings-view="view-ai-behavior">振る舞い（プロンプト・温度）設定画面</button>
                         <button class="settings-nav-card" data-settings-view="view-ai-context">コンテキスト / 署名設定画面</button>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="space-y-1">
+                                <label class="flex items-center gap-2 text-sm dark:text-white">
+                                    <input type="checkbox" id="allow-gemini-search" class="h-4 w-4">
+                                    Gemini の検索を許可
+                                </label>
+                                <p class="text-xs text-amber-700 dark:text-amber-300">APIの無料枠では使用できません</p>
+                            </div>
+                            <label class="flex items-center gap-2 text-sm dark:text-white">
+                                <input type="checkbox" id="allow-openai-search" class="h-4 w-4">
+                                OpenAI の検索を許可
+                            </label>
+                        </div>
                         <input id="persona-name" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white" placeholder="保存するプリセット名">
                         <button onclick="savePersona()" class="w-full bg-indigo-600 text-white py-2 rounded-lg settings-action-btn">プリセット保存</button>
                     </div>
@@ -134,6 +147,14 @@
                             <option value="openai">ChatGPT (OpenAI)</option>
                         </select>
                         <select id="new-session-model" class="w-full border rounded-xl p-3 dark:bg-slate-700 dark:text-white"></select>
+                        <label class="flex items-center gap-2 text-sm dark:text-white">
+                            <input type="checkbox" id="new-session-allow-gemini-search" class="h-4 w-4">
+                            新規会話で Gemini の検索を許可
+                        </label>
+                        <label class="flex items-center gap-2 text-sm dark:text-white">
+                            <input type="checkbox" id="new-session-allow-openai-search" class="h-4 w-4">
+                            新規会話で OpenAI の検索を許可
+                        </label>
                     </div>
 
                     <div id="view-ai-model" class="settings-view hidden space-y-3" data-view-title="モデル設定">
