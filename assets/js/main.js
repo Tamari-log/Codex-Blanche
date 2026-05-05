@@ -115,6 +115,13 @@ function isNearChatBottom() {
   return distanceFromBottom <= SCROLL_BOTTOM_THRESHOLD_PX;
 }
 
+function restoreScrollFromBottom(distanceFromBottom = 0) {
+  if (!chatArea) return;
+  const maxScrollTop = Math.max(0, chatArea.scrollHeight - chatArea.clientHeight);
+  const nextScrollTop = chatArea.scrollHeight - chatArea.clientHeight - Math.max(0, Number(distanceFromBottom) || 0);
+  chatArea.scrollTop = Math.max(0, Math.min(nextScrollTop, maxScrollTop));
+}
+
 
 function appendDevLog(level, args) {
   const text = args.map((arg) => {
@@ -1298,7 +1305,8 @@ ${BACKGROUND_WARNING_TEXT}`,'ai');
 
     const apiMessages = buildApiMessages(s.messages);
     const reply=await appApi.generateAssistantReply({ provider, messages: apiMessages, apiKey, settings: effectiveSettings, signal: controller.signal, onChunk });
-    const finalReply=normalizeEditableText(reply||streamedReply);
+    const normalizedFinalReply=normalizeEditableText(reply||streamedReply);
+    const finalReply=normalizedFinalReply||'（応答が空でした。もう一度お試しください）';
     console.info('[stream][send] request end',{provider,hasStreamStarted,replyLength:(reply||'').length,streamedReplyLength:streamedReply.length,finalReplySource:reply?'reply':'streamedReply'});
     if(inkRevealer){inkRevealer.finish(finalReply);await inkRevealer.waitForIdle();}
     else if(loading?.div&&!hasStreamStarted){await appUi.revealWithQuillEffect(chatArea, loading.div, finalReply);}
@@ -1384,7 +1392,8 @@ async function regenerateAt(index){
       }
     };
     const reply=await appApi.generateAssistantReply({ provider, messages: apiMessages, apiKey, settings: effectiveSettings, signal: controller.signal, onChunk });
-    const finalReply=normalizeEditableText(reply||streamedReply);
+    const normalizedFinalReply=normalizeEditableText(reply||streamedReply);
+    const finalReply=normalizedFinalReply||'（応答が空でした。もう一度お試しください）';
     if(inkRevealer){
       inkRevealer.finish(finalReply);
       await inkRevealer.waitForIdle();
@@ -1396,6 +1405,11 @@ async function regenerateAt(index){
       addBubble(finalReply,'ai',s.messages.length-1,true);
     }else{
       renderHistory(true);
+    }
+    if(!wasNearBottom){
+      restoreScrollFromBottom(prevDistanceFromBottom);
+      shouldAutoScrollDuringGeneration=false;
+      updateScrollToBottomButtonVisibility();
     }
   }catch(e){
     if(inkRevealer)inkRevealer.cancel();
