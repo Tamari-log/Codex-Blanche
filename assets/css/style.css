@@ -98,6 +98,12 @@ body { font-family: 'Noto Serif JP', serif; }
     color: #f8fafc;
 }
 
+/* 最後のメッセージ下だけ過剰な余白を抑える */
+#chat-area > div:last-child .user-msg,
+#chat-area > div:last-child .ai-msg {
+    margin-bottom: 0.35rem;
+}
+
 
 /* 編集中のスタイルも「紙に書き込んでいる」風に */
 [contenteditable="true"]:focus {
