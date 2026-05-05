@@ -78,6 +78,9 @@ const MAX_FILE_TOTAL_TEXT_CHARS = 36000;
 const MAX_FILE_TEXT_BYTES = 256 * 1024;
 const MAX_FILE_CHUNK_CHARS = 4000;
 const MAX_PDF_PAGES = 40;
+const PDF_JS_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDF_JS_WORKER_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const MAMMOTH_CDN_URL = 'https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js';
 const TEXT_FILE_EXTENSIONS = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'yaml', 'yml', 'xml', 'html', 'css', 'js', 'mjs', 'cjs', 'ts', 'tsx', 'jsx', 'py', 'java', 'go', 'rs', 'c', 'cpp', 'h', 'hpp', 'sql', 'log']);
 const BACKGROUND_WARNING_TEXT = '※ バックグラウンド中はOS制限で処理が中断される場合があります。';
 const CHAT_IMPORT_PREFIX = window.appImportExport?.CHAT_IMPORT_PREFIX || '__CODEX_CHATS__';
@@ -89,6 +92,7 @@ const SETTINGS_SAVE_DEBOUNCE_MS = 180;
 const PERSONA_SEARCH_RENDER_DEBOUNCE_MS = 120;
 let settingsSaveTimer = null;
 let personaSearchRenderTimer = null;
+const dynamicScriptLoadPromises = Object.create(null);
 
 function scrollChatToTop() {
   chatArea.scrollTo({ top: 0, behavior: 'smooth' });
@@ -471,7 +475,7 @@ async function startNewSession({ systemPrompt = '', activePersonaId = null, over
 function renderHistory(scrollToBottom=false){chatArea.innerHTML='';const session=getActiveSession();if(!session||session.messages.length===0){addBubble('ようこそ、白い写本へ。','ai',null,false);if(scrollToBottom)chatArea.scrollTop=chatArea.scrollHeight;updateScrollToBottomButtonVisibility();return;}session.messages.forEach((item,index)=>addBubble(item.text,item.role,index,true,item.attachments||[]));if(scrollToBottom)chatArea.scrollTop=chatArea.scrollHeight;updateScrollToBottomButtonVisibility();}
 function updateVisibleUserSignatures(){const session=getActiveSession();const signature=session?.userSignature||state.settings.userSignature||'Blanche';chatArea?.querySelectorAll('.user-msg').forEach((node)=>{node.dataset.signature=`${signature}:`;});}
 function renderMessageAttachments(attachments=[]){const validAttachments=Array.isArray(attachments)?attachments.filter((attachment)=>attachment&&typeof attachment==='object'):[];if(!validAttachments.length)return null;const tray=document.createElement('div');tray.className='message-attachment-tray';validAttachments.forEach((attachment,index)=>{const item=document.createElement('div');item.className='message-attachment-item';const name=attachment.name||`添付ファイル${index+1}`;const isImage=attachment.type==='image'&&typeof attachment.dataUrl==='string'&&attachment.dataUrl.startsWith('data:image');if(isImage){const thumb=document.createElement('img');thumb.className='message-attachment-thumb';thumb.src=attachment.dataUrl;thumb.alt=name;item.appendChild(thumb);}else{const icon=document.createElement('span');icon.className='message-attachment-icon';icon.textContent='📎';item.appendChild(icon);}const label=document.createElement('span');label.className='message-attachment-name';label.textContent=name;item.appendChild(label);tray.appendChild(item);});return tray;}
-function addBubble(text,role,index=null,editable=false,attachments=[]){const wrap=document.createElement('div');wrap.className='space-y-1';const div=document.createElement('div');div.className=role==='user'?'user-msg':'ai-msg';if(role==='user'){const session=getActiveSession();const signature=session?.userSignature||state.settings.userSignature||'Blanche';div.dataset.signature=`${signature}:`;}const startEditable=index===null&&editable;div.contentEditable=startEditable;appUi.applyBubbleText(div, text, { markdown: role==='ai' });const beginEdit=()=>{div.contentEditable='true';div.innerText=div.dataset.rawText||div.innerText;div.focus();const range=document.createRange();range.selectNodeContents(div);range.collapse(false);const sel=window.getSelection();sel?.removeAllRanges();sel?.addRange(range);};const endEdit=()=>{div.contentEditable='false';};div.onblur=()=>{if(index===null)return;const nextText=normalizeEditableText(div.innerText);const session=getActiveSession();if(session?.messages[index]){session.messages[index].text=nextText;persistState();}appUi.applyBubbleText(div,nextText,{ markdown: role==='ai' });endEdit();};wrap.appendChild(div);if(role==='user'){const tray=renderMessageAttachments(attachments);if(tray)wrap.appendChild(tray);}if(index!==null){const controls=document.createElement('div');controls.className='flex justify-end gap-2 text-xs';const edit=document.createElement('button');edit.className='px-2 py-1 rounded bg-amber-600 text-white';edit.innerText='編集';edit.onclick=()=>beginEdit();controls.appendChild(edit);const del=document.createElement('button');del.className='px-2 py-1 rounded bg-slate-700 text-white';del.innerText='削除';del.onclick=()=>deleteMessage(index);controls.appendChild(del);if(role==='user'){const retry=document.createElement('button');retry.className='px-2 py-1 rounded bg-indigo-600 text-white';retry.innerText='やり直し';retry.onclick=()=>regenerateAt(index);controls.appendChild(retry);}wrap.appendChild(controls);}chatArea.appendChild(wrap);updateScrollToBottomButtonVisibility();return {wrap,div};}
+function addBubble(text,role,index=null,editable=false,attachments=[]){const wrap=document.createElement('div');wrap.className='space-y-1';const div=document.createElement('div');div.className=role==='user'?'user-msg':'ai-msg';if(role==='user'){const session=getActiveSession();const signature=session?.userSignature||state.settings.userSignature||'Blanche';div.dataset.signature=`${signature}:`;}const startEditable=index===null&&editable;div.contentEditable=startEditable;appUi.applyBubbleText(div, text, { markdown: role==='ai' });const beginEdit=()=>{div.contentEditable='true';div.innerText=div.dataset.rawText||div.innerText;div.focus();const range=document.createRange();range.selectNodeContents(div);range.collapse(false);const sel=window.getSelection();sel?.removeAllRanges();sel?.addRange(range);};const endEdit=()=>{div.contentEditable='false';};div.onblur=()=>{if(index===null)return;const nextText=normalizeEditableText(div.innerText);const session=getActiveSession();if(session?.messages[index]){session.messages[index].text=nextText;persistState();}appUi.applyBubbleText(div,nextText,{ markdown: role==='ai' });endEdit();};wrap.appendChild(div);if(role==='user'){const tray=renderMessageAttachments(attachments);if(tray)wrap.appendChild(tray);}if(index!==null){const controls=document.createElement('div');controls.className='flex justify-end gap-2 text-xs';const edit=document.createElement('button');edit.className='px-2 py-1 rounded bg-amber-600 text-white';edit.innerText='編集';edit.onclick=()=>beginEdit();controls.appendChild(edit);const del=document.createElement('button');del.className='px-2 py-1 rounded bg-slate-700 text-white';del.innerText='削除';del.onclick=()=>deleteMessage(index);controls.appendChild(del);if(role==='user'){const retry=document.createElement('button');retry.className='px-2 py-1 rounded bg-indigo-600 text-white regenerate-btn';retry.innerText='やり直し';retry.onclick=()=>regenerateAt(index);controls.appendChild(retry);}wrap.appendChild(controls);}chatArea.appendChild(wrap);updateScrollToBottomButtonVisibility();return {wrap,div};}
 
 function openSessionConfigEditor(sessionId){
   const session=state.sessions.find((x)=>x.id===sessionId);
@@ -840,6 +844,7 @@ let wakeLockSentinel = null;
 let selectedImageAttachments = [];
 let selectedFileAttachments = [];
 let shouldAutoScrollDuringGeneration = true;
+let isRegenerating = false;
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -890,14 +895,15 @@ function getFileExtension(name = '') {
 }
 
 async function extractPdfText(file) {
-  if (!window.pdfjsLib?.getDocument) {
+  const pdfjsLib = await ensurePdfJsLib();
+  if (!pdfjsLib?.getDocument) {
     throw new Error('pdf_parser_unavailable');
   }
-  if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_JS_WORKER_CDN_URL;
   }
   const buffer = await file.arrayBuffer();
-  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
   const pageLimit = Math.min(pdf.numPages, MAX_PDF_PAGES);
   const pages = [];
   for (let i = 1; i <= pageLimit; i += 1) {
@@ -915,12 +921,53 @@ async function extractPdfText(file) {
 }
 
 async function extractDocxText(file) {
-  if (!window.mammoth?.extractRawText) {
+  const mammoth = await ensureMammothLib();
+  if (!mammoth?.extractRawText) {
     throw new Error('docx_parser_unavailable');
   }
   const buffer = await file.arrayBuffer();
-  const result = await window.mammoth.extractRawText({ arrayBuffer: buffer });
+  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
   return { text: result?.value || '' };
+}
+
+function loadScriptOnce(url, globalAccessor) {
+  if (typeof globalAccessor === 'function') {
+    const existing = globalAccessor();
+    if (existing) return Promise.resolve(existing);
+  }
+  if (!dynamicScriptLoadPromises[url]) {
+    dynamicScriptLoadPromises[url] = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = url;
+      script.async = true;
+      script.onload = () => {
+        if (typeof globalAccessor === 'function') {
+          const loaded = globalAccessor();
+          if (!loaded) {
+            reject(new Error('script_loaded_but_global_missing'));
+            return;
+          }
+          resolve(loaded);
+          return;
+        }
+        resolve(null);
+      };
+      script.onerror = () => {
+        delete dynamicScriptLoadPromises[url];
+        reject(new Error(`script_load_failed:${url}`));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return dynamicScriptLoadPromises[url];
+}
+
+async function ensurePdfJsLib() {
+  return loadScriptOnce(PDF_JS_CDN_URL, () => window.pdfjsLib);
+}
+
+async function ensureMammothLib() {
+  return loadScriptOnce(MAMMOTH_CDN_URL, () => window.mammoth);
 }
 
 async function extractTextFromFile(file) {
@@ -1111,6 +1158,14 @@ function clearSelectedFileAttachments() {
   renderFilePreview();
 }
 
+function setRegenerateButtonsDisabled(disabled) {
+  document.querySelectorAll('.regenerate-btn').forEach((button) => {
+    button.disabled = disabled;
+    button.classList.toggle('opacity-50', disabled);
+    button.classList.toggle('pointer-events-none', disabled);
+  });
+}
+
 async function requestWakeLockIfAvailable() {
   if (!('wakeLock' in navigator)) return false;
   try {
@@ -1134,14 +1189,20 @@ function releaseWakeLock() {
 
 
 function buildApiMessages(messages = []) {
-  const source = Array.isArray(messages) ? [...messages].reverse() : [];
+  if (!Array.isArray(messages) || !messages.length) return [];
+  const hasAnyAttachment = messages.some((message) => Array.isArray(message?.attachments) && message.attachments.length > 0);
+  if (!hasAnyAttachment) return messages;
+
+  const nextMessages = messages.slice();
   let remainingAttachmentMessages = MAX_API_ATTACHMENT_MESSAGES;
   let remainingImageAttachments = MAX_API_IMAGE_ATTACHMENTS;
 
-  return source.map((message) => {
-    if (!Array.isArray(message?.attachments) || !message.attachments.length) return message;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (!Array.isArray(message?.attachments) || !message.attachments.length) continue;
     if (remainingAttachmentMessages <= 0) {
-      return { ...message, attachments: [] };
+      nextMessages[i] = { ...message, attachments: [] };
+      continue;
     }
 
     const nextAttachments = [];
@@ -1151,10 +1212,11 @@ function buildApiMessages(messages = []) {
       nextAttachments.push(attachment);
       remainingImageAttachments -= 1;
     }
-
+    nextMessages[i] = { ...message, attachments: nextAttachments };
     remainingAttachmentMessages -= 1;
-    return { ...message, attachments: nextAttachments };
-  }).reverse();
+  }
+
+  return nextMessages;
 }
 
 function handleVisibilityDuringGeneration() {
@@ -1204,7 +1266,7 @@ async function handleSend(){
     if(attachments.length){outgoing.attachments=attachments;}
 
     s.messages.push(outgoing);
-    await persistState();
+    await persistState({ syncDrive: false });
     if(s.messages.length===1){chatArea.innerHTML='';}
     addBubble(outgoingText,'user',s.messages.length-1,true,attachments);
     userInput.value='';
@@ -1267,6 +1329,7 @@ ${BACKGROUND_WARNING_TEXT}`,'ai');
 }
 async function deleteMessage(index){const s=getActiveSession();if(!s?.messages[index])return;s.messages.splice(index,1);await persistState();renderHistory();}
 async function regenerateAt(index){
+  if(isRegenerating||currentRequestController)return;
   const s=getActiveSession();
   if(!s?.messages[index])return;
   const target=s.messages[index];
@@ -1275,24 +1338,34 @@ async function regenerateAt(index){
   const provider=effectiveSettings.provider||state.settings.provider;
   const apiKey=provider==='gemini'?state.settings.geminiKey:state.settings.openaiKey;
   if(!apiKey)return;
+
   const wasNearBottom=isNearChatBottom();
-  const prevScrollTop=chatArea?.scrollTop||0;
+  const prevDistanceFromBottom=chatArea?(chatArea.scrollHeight-chatArea.scrollTop-chatArea.clientHeight):0;
   const context=target.role==='user'?s.messages.slice(0,index+1):s.messages.slice(0,index);
+  const controller=new AbortController();
+
+  isRegenerating=true;
+  currentRequestController=controller;
+  setRegenerateButtonsDisabled(true);
+  await requestWakeLockIfAvailable();
+  appUi.setThinkingMode(dom.sendBtn, true, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });
+
   s.messages=context;
-  await persistState();
+  await persistState({ syncDrive: false });
   renderHistory();
   if(chatArea){
     if(wasNearBottom){
       chatArea.scrollTop=chatArea.scrollHeight;
     }else{
       const maxScrollTop=Math.max(0,chatArea.scrollHeight-chatArea.clientHeight);
-      chatArea.scrollTop=Math.min(prevScrollTop,maxScrollTop);
+      const nextScrollTop=chatArea.scrollHeight-chatArea.clientHeight-prevDistanceFromBottom;
+      chatArea.scrollTop=Math.max(0,Math.min(nextScrollTop,maxScrollTop));
     }
   }
   const loading=addBubble('思索中...','ai');
   let streamedReply='';
   let inkRevealer=null;
-  shouldAutoScrollDuringGeneration=true;
+  shouldAutoScrollDuringGeneration=wasNearBottom;
   try{
     const apiMessages = buildApiMessages(context);
     const renderSpeed=effectiveSettings.renderSpeed||'normal';
@@ -1310,7 +1383,7 @@ async function regenerateAt(index){
         if(shouldAutoScrollDuringGeneration)chatArea.scrollTop=chatArea.scrollHeight;
       }
     };
-    const reply=await appApi.generateAssistantReply({ provider, messages: apiMessages, apiKey, settings: effectiveSettings, onChunk });
+    const reply=await appApi.generateAssistantReply({ provider, messages: apiMessages, apiKey, settings: effectiveSettings, signal: controller.signal, onChunk });
     const finalReply=normalizeEditableText(reply||streamedReply);
     if(inkRevealer){
       inkRevealer.finish(finalReply);
@@ -1326,10 +1399,19 @@ async function regenerateAt(index){
     }
   }catch(e){
     if(inkRevealer)inkRevealer.cancel();
-    loading.div.innerText=`エラー：${e.message||e}`;
+    if(e?.name==='AbortError'){
+      loading.div.innerText=streamedReply||'生成を中断しました。';
+    }else{
+      loading.div.innerText=`エラー：${e.message||e}`;
+    }
     appUi.addTransientDeleteButton(loading.wrap);
   }finally{
     shouldAutoScrollDuringGeneration=true;
+    isRegenerating=false;
+    currentRequestController=null;
+    releaseWakeLock();
+    appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });
+    setRegenerateButtonsDisabled(false);
   }
 }
 async function deleteSessionById(sessionId){const target=state.sessions.find((x)=>x.id===sessionId);if(!target)return;const confirmed=window.confirm(`会話「${target.title}」を削除しますか？\nこの操作は取り消せません。`);if(!confirmed)return;state.sessions=state.sessions.filter((x)=>x.id!==target.id);if(state.sessions.length===0){await startNewSession();return;}if(state.activeSessionId===target.id)state.activeSessionId=state.sessions[0].id;renderHistory();renderSessionList();renderPersonaTabs();await persistState();}

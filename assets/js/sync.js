@@ -1,5 +1,10 @@
 function createDriveSync(deps) {
   const { state, dom, STORAGE_KEYS, DEFAULT_DRIVE_FOLDER_NAME, DEFAULT_DRIVE_FILE_NAME, DRIVE_SCOPE, TOMBSTONE_RETENTION_MS, CONFLICT_TIME_BUFFER_MS, getErrorMessage, startNewSession, persistState, renderHistory, renderSessionList, renderPersonaTabs } = deps;
+  const renderSyncedViews = () => {
+    renderHistory();
+    renderSessionList();
+    renderPersonaTabs();
+  };
   function buildGoogleAuthErrorMessage(resp = {}) {
     const code = String(resp?.error || '').trim();
     const desc = String(resp?.error_description || '').trim();
@@ -211,7 +216,7 @@ function createDriveSync(deps) {
           if (!state.sessions.length) await startNewSession();
           await persistState({ syncDrive: false });
           if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
-          renderHistory(); renderSessionList(); renderPersonaTabs();
+          renderSyncedViews();
           this.setStatus(`Drive: 削除マークを適用 ${new Date().toLocaleTimeString('ja-JP')}`);
           return;
         }
@@ -223,11 +228,11 @@ function createDriveSync(deps) {
       if (!state.activeSessionId || !state.sessions.find((s) => s.id === state.activeSessionId)) state.activeSessionId = state.sessions[0]?.id || null;
       await persistState({ syncDrive: false });
       if (fileMeta.result?.modifiedTime) this.setLastRemoteModifiedAt(fileMeta.result.modifiedTime);
-      renderHistory(); renderSessionList(); renderPersonaTabs();
+      renderSyncedViews();
       this.setStatus(`Drive: 取得済み ${new Date().toLocaleTimeString('ja-JP')}`);
     });
   },
-};;
+};
 }
 
 window.appSync = { createDriveSync };
