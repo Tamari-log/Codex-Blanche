@@ -122,6 +122,26 @@ function restoreScrollFromBottom(distanceFromBottom = 0) {
   chatArea.scrollTop = Math.max(0, Math.min(nextScrollTop, maxScrollTop));
 }
 
+function getMessageAnchorInfo(messageIndex) {
+  if (!chatArea || !Number.isInteger(messageIndex) || messageIndex < 0) return null;
+  const anchorEl = chatArea.querySelector(`[data-msg-index="${messageIndex}"]`);
+  if (!anchorEl) return null;
+  return {
+    messageIndex,
+    offsetFromViewportTop: anchorEl.offsetTop - chatArea.scrollTop,
+  };
+}
+
+function restoreScrollToMessageAnchor(anchorInfo) {
+  if (!chatArea || !anchorInfo) return false;
+  const anchorEl = chatArea.querySelector(`[data-msg-index="${anchorInfo.messageIndex}"]`);
+  if (!anchorEl) return false;
+  const maxScrollTop = Math.max(0, chatArea.scrollHeight - chatArea.clientHeight);
+  const nextScrollTop = anchorEl.offsetTop - (Number(anchorInfo.offsetFromViewportTop) || 0);
+  chatArea.scrollTop = Math.max(0, Math.min(nextScrollTop, maxScrollTop));
+  return true;
+}
+
 
 function appendDevLog(level, args) {
   const text = args.map((arg) => {
@@ -267,24 +287,43 @@ function extractConversationGroupsByWorld(data) {
   return groups;
 }
 
-function extractConversationHistoryOnly(data) {
-  const sessions = [];
-  const pushSession = (session) => {
+function extractConversationHistoryOnlyByWorld(data) {
+  const groups = {};
+  const ensureWorld = (worldName) => {
+    const key = normalizeWorldName(worldName);
+    if (!groups[key]) groups[key] = [];
+    return groups[key];
+  };
+  const pushSession = (worldName, session) => {
     if (!session || !Array.isArray(session.messages)) return;
-    const normalized = normalizeImportedSession(session, sessions.length);
+    const bucket = ensureWorld(worldName);
+    const normalized = normalizeImportedSession(session, bucket.length);
     if (!normalized.messages.length) return;
-    sessions.push({ messages: normalized.messages });
+    bucket.push({ messages: normalized.messages });
   };
 
-  if (Array.isArray(data)) data.forEach(pushSession);
-  if (Array.isArray(data?.sessions)) data.sessions.forEach(pushSession);
-  if (Array.isArray(data?.worlds)) {
-    data.worlds.forEach((world) => {
-      const candidates = Array.isArray(world?.sessions) ? world.sessions : Array.isArray(world?.conversations) ? world.conversations : [];
-      candidates.forEach(pushSession);
+  if (Array.isArray(data)) {
+    data.forEach((session) => {
+      const worldName = session?.worldSetting || session?.world || session?.settings?.world || session?.meta?.world || 'default';
+      pushSession(worldName, session);
     });
   }
-  return sessions;
+  if (Array.isArray(data?.sessions)) {
+    data.sessions.forEach((session) => {
+      const worldName = session?.worldSetting || session?.world || session?.settings?.world || session?.meta?.world || 'default';
+      pushSession(worldName, session);
+    });
+  }
+  if (Array.isArray(data?.worlds)) {
+    data.worlds.forEach((world, worldIndex) => {
+      const worldName = world?.name || world?.id || `world-${worldIndex + 1}`;
+      const candidates = Array.isArray(world?.sessions) ? world.sessions : Array.isArray(world?.conversations) ? world.conversations : [];
+      candidates.forEach((session) => pushSession(worldName, session));
+    });
+  }
+
+  Object.keys(groups).forEach((key) => { if (!groups[key].length) delete groups[key]; });
+  return groups;
 }
 
 function downloadJsonFile(filename, payload) {
@@ -365,11 +404,17 @@ async function runConversationHistoryOnlyJsonExtraction() {
   try {
     const sourceText = await selectedConversationHistoryOnlySourceFile.text();
     const parsed = JSON.parse(sourceText);
-    const sessions = extractConversationHistoryOnly(parsed);
-    if (!sessions.length) throw new Error('会話履歴を検出できませんでした。');
-    const output = sanitizeConversationJsonNode({ exportedAt: new Date().toISOString(), sourceFileName: selectedConversationHistoryOnlySourceFile.name, sessions });
-    downloadJsonFile(`conversation_history_only_${Date.now()}.json`, output);
-    if (dom.conversationHistoryOnlyJsonStatus) dom.conversationHistoryOnlyJsonStatus.textContent = `${sessions.length}件の会話履歴を抽出して保存しました。`;
+    const groups = extractConversationHistoryOnlyByWorld(parsed);
+    const worldCount = Object.keys(groups).length;
+    if (!worldCount) throw new Error('会話履歴を検出できませんでした。');
+    const exportedAt = new Date().toISOString();
+    const timestamp = Date.now();
+    Object.entries(groups).forEach(([worldName, sessions], index) => {
+      const output = sanitizeConversationJsonNode({ exportedAt, sourceFileName: selectedConversationHistoryOnlySourceFile.name, sessions });
+      const worldToken = toSafeFilename(worldName, `world-${index + 1}`);
+      downloadJsonFile(`conversation_history_only_${worldToken}_${timestamp}.json`, output);
+    });
+    if (dom.conversationHistoryOnlyJsonStatus) dom.conversationHistoryOnlyJsonStatus.textContent = `${worldCount}件の世界設定ごとに会話履歴を分けて保存しました。`;
   } catch (error) {
     const message = `抽出失敗: ${getErrorMessage(error)}`;
     if (dom.conversationHistoryOnlyJsonStatus) dom.conversationHistoryOnlyJsonStatus.textContent = message;
@@ -482,7 +527,7 @@ async function startNewSession({ systemPrompt = '', activePersonaId = null, over
 function renderHistory(scrollToBottom=false){chatArea.innerHTML='';const session=getActiveSession();if(!session||session.messages.length===0){addBubble('ようこそ、白い写本へ。','ai',null,false);if(scrollToBottom)chatArea.scrollTop=chatArea.scrollHeight;updateScrollToBottomButtonVisibility();return;}session.messages.forEach((item,index)=>addBubble(item.text,item.role,index,true,item.attachments||[]));if(scrollToBottom)chatArea.scrollTop=chatArea.scrollHeight;updateScrollToBottomButtonVisibility();}
 function updateVisibleUserSignatures(){const session=getActiveSession();const signature=session?.userSignature||state.settings.userSignature||'Blanche';chatArea?.querySelectorAll('.user-msg').forEach((node)=>{node.dataset.signature=`${signature}:`;});}
 function renderMessageAttachments(attachments=[]){const validAttachments=Array.isArray(attachments)?attachments.filter((attachment)=>attachment&&typeof attachment==='object'):[];if(!validAttachments.length)return null;const tray=document.createElement('div');tray.className='message-attachment-tray';validAttachments.forEach((attachment,index)=>{const item=document.createElement('div');item.className='message-attachment-item';const name=attachment.name||`添付ファイル${index+1}`;const isImage=attachment.type==='image'&&typeof attachment.dataUrl==='string'&&attachment.dataUrl.startsWith('data:image');if(isImage){const thumb=document.createElement('img');thumb.className='message-attachment-thumb';thumb.src=attachment.dataUrl;thumb.alt=name;item.appendChild(thumb);}else{const icon=document.createElement('span');icon.className='message-attachment-icon';icon.textContent='📎';item.appendChild(icon);}const label=document.createElement('span');label.className='message-attachment-name';label.textContent=name;item.appendChild(label);tray.appendChild(item);});return tray;}
-function addBubble(text,role,index=null,editable=false,attachments=[]){const wrap=document.createElement('div');wrap.className='space-y-1';const div=document.createElement('div');div.className=role==='user'?'user-msg':'ai-msg';if(role==='user'){const session=getActiveSession();const signature=session?.userSignature||state.settings.userSignature||'Blanche';div.dataset.signature=`${signature}:`;}const startEditable=index===null&&editable;div.contentEditable=startEditable;appUi.applyBubbleText(div, text, { markdown: role==='ai' });const beginEdit=()=>{div.contentEditable='true';div.innerText=div.dataset.rawText||div.innerText;div.focus();const range=document.createRange();range.selectNodeContents(div);range.collapse(false);const sel=window.getSelection();sel?.removeAllRanges();sel?.addRange(range);};const endEdit=()=>{div.contentEditable='false';};div.onblur=()=>{if(index===null)return;const nextText=normalizeEditableText(div.innerText);const session=getActiveSession();if(session?.messages[index]){session.messages[index].text=nextText;persistState();}appUi.applyBubbleText(div,nextText,{ markdown: role==='ai' });endEdit();};wrap.appendChild(div);if(role==='user'){const tray=renderMessageAttachments(attachments);if(tray)wrap.appendChild(tray);}if(index!==null){const controls=document.createElement('div');controls.className='flex justify-end gap-2 text-xs';const edit=document.createElement('button');edit.className='px-2 py-1 rounded bg-amber-600 text-white';edit.innerText='編集';edit.onclick=()=>beginEdit();controls.appendChild(edit);const del=document.createElement('button');del.className='px-2 py-1 rounded bg-slate-700 text-white';del.innerText='削除';del.onclick=()=>deleteMessage(index);controls.appendChild(del);if(role==='user'){const retry=document.createElement('button');retry.className='px-2 py-1 rounded bg-indigo-600 text-white regenerate-btn';retry.innerText='やり直し';retry.onclick=()=>regenerateAt(index);controls.appendChild(retry);}wrap.appendChild(controls);}chatArea.appendChild(wrap);updateScrollToBottomButtonVisibility();return {wrap,div};}
+function addBubble(text,role,index=null,editable=false,attachments=[]){const wrap=document.createElement('div');wrap.className='space-y-1';const div=document.createElement('div');div.className=role==='user'?'user-msg':'ai-msg';if(role==='user'){const session=getActiveSession();const signature=session?.userSignature||state.settings.userSignature||'Blanche';div.dataset.signature=`${signature}:`;}const startEditable=index===null&&editable;div.contentEditable=startEditable;appUi.applyBubbleText(div, text, { markdown: role==='ai' });const beginEdit=()=>{div.contentEditable='true';div.innerText=div.dataset.rawText||div.innerText;div.focus();const range=document.createRange();range.selectNodeContents(div);range.collapse(false);const sel=window.getSelection();sel?.removeAllRanges();sel?.addRange(range);};const endEdit=()=>{div.contentEditable='false';};div.onblur=()=>{if(index===null)return;const nextText=normalizeEditableText(div.innerText);const session=getActiveSession();if(session?.messages[index]){session.messages[index].text=nextText;persistState();}appUi.applyBubbleText(div,nextText,{ markdown: role==='ai' });endEdit();};if(index!==null)wrap.dataset.msgIndex=String(index);wrap.appendChild(div);if(role==='user'){const tray=renderMessageAttachments(attachments);if(tray)wrap.appendChild(tray);}if(index!==null){const controls=document.createElement('div');controls.className='flex justify-end gap-2 text-xs';const edit=document.createElement('button');edit.className='px-2 py-1 rounded bg-amber-600 text-white';edit.innerText='編集';edit.onclick=()=>beginEdit();controls.appendChild(edit);const del=document.createElement('button');del.className='px-2 py-1 rounded bg-slate-700 text-white';del.innerText='削除';del.onclick=()=>deleteMessage(index);controls.appendChild(del);if(role==='user'){const retry=document.createElement('button');retry.className='px-2 py-1 rounded bg-indigo-600 text-white regenerate-btn';retry.innerText='やり直し';retry.onclick=()=>regenerateAt(index);controls.appendChild(retry);}wrap.appendChild(controls);}chatArea.appendChild(wrap);updateScrollToBottomButtonVisibility();return {wrap,div};}
 
 function openSessionConfigEditor(sessionId){
   const session=state.sessions.find((x)=>x.id===sessionId);
@@ -1276,6 +1321,8 @@ async function handleSend(){
     await persistState({ syncDrive: false });
     if(s.messages.length===1){chatArea.innerHTML='';}
     addBubble(outgoingText,'user',s.messages.length-1,true,attachments);
+    chatArea.scrollTop=chatArea.scrollHeight;
+    updateScrollToBottomButtonVisibility();
     userInput.value='';
     userInput.dispatchEvent(new Event('input'));
     clearSelectedImageAttachment();
@@ -1349,6 +1396,8 @@ async function regenerateAt(index){
 
   const wasNearBottom=isNearChatBottom();
   const prevDistanceFromBottom=chatArea?(chatArea.scrollHeight-chatArea.scrollTop-chatArea.clientHeight):0;
+  const anchorMessageIndex=target.role==='user'?index:Math.max(0,index-1);
+  const anchorInfo=getMessageAnchorInfo(anchorMessageIndex);
   const context=target.role==='user'?s.messages.slice(0,index+1):s.messages.slice(0,index);
   const controller=new AbortController();
 
@@ -1362,7 +1411,9 @@ async function regenerateAt(index){
   await persistState({ syncDrive: false });
   renderHistory();
   if(chatArea){
-    if(wasNearBottom){
+    if(!wasNearBottom&&restoreScrollToMessageAnchor(anchorInfo)){
+      // anchored to selected message context
+    }else if(wasNearBottom){
       chatArea.scrollTop=chatArea.scrollHeight;
     }else{
       const maxScrollTop=Math.max(0,chatArea.scrollHeight-chatArea.clientHeight);
@@ -1407,7 +1458,9 @@ async function regenerateAt(index){
       renderHistory(true);
     }
     if(!wasNearBottom){
-      restoreScrollFromBottom(prevDistanceFromBottom);
+      if(!restoreScrollToMessageAnchor(anchorInfo)){
+        restoreScrollFromBottom(prevDistanceFromBottom);
+      }
       shouldAutoScrollDuringGeneration=false;
       updateScrollToBottomButtonVisibility();
     }
