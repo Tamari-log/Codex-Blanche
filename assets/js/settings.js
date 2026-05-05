@@ -22,6 +22,10 @@
     newSessionProvider: 'new_session_provider',
     newSessionGeminiModel: 'new_session_gemini_model',
     newSessionOpenaiModel: 'new_session_openai_model',
+    allowGeminiSearch: 'allow_gemini_search',
+    allowOpenaiSearch: 'allow_openai_search',
+    newSessionAllowGeminiSearch: 'new_session_allow_gemini_search',
+    newSessionAllowOpenaiSearch: 'new_session_allow_openai_search',
     localUpdatedAt: 'codex_local_updated_at',
     lastRemoteModifiedAt: 'codex_last_remote_modified_at',
     deletedAt: 'codex_deleted_at',
@@ -35,6 +39,8 @@
     temperature: 0.7,
     maxTokens: 2048,
     renderSpeed: 'normal',
+    allowGeminiSearch: false,
+    allowOpenaiSearch: false,
   };
 
   const CONTEXT_LIMITS = {
@@ -73,6 +79,10 @@
       newSessionProvider: localStorage.getItem(STORAGE_KEYS.newSessionProvider) || DEFAULT_SETTINGS.provider,
       newSessionGeminiModel: localStorage.getItem(STORAGE_KEYS.newSessionGeminiModel) || DEFAULT_SETTINGS.geminiModel,
       newSessionOpenaiModel: localStorage.getItem(STORAGE_KEYS.newSessionOpenaiModel) || DEFAULT_SETTINGS.openaiModel,
+      allowGeminiSearch: localStorage.getItem(STORAGE_KEYS.allowGeminiSearch) === 'true',
+      allowOpenaiSearch: localStorage.getItem(STORAGE_KEYS.allowOpenaiSearch) === 'true',
+      newSessionAllowGeminiSearch: localStorage.getItem(STORAGE_KEYS.newSessionAllowGeminiSearch) === 'true',
+      newSessionAllowOpenaiSearch: localStorage.getItem(STORAGE_KEYS.newSessionAllowOpenaiSearch) === 'true',
       rememberApiKeys: localStorage.getItem(STORAGE_KEYS.rememberApiKeys) === 'true',
       rememberGoogleLogin: localStorage.getItem(STORAGE_KEYS.rememberGoogleLogin) === 'true',
     };

@@ -6,6 +6,7 @@ function generateAssistantReply({ provider, messages, apiKey, settings, signal, 
   if (provider === 'gemini') {
     return callGeminiAPI(messages, apiKey, {
       model: settings.geminiModel,
+      allowSearch: Boolean(settings.allowGeminiSearch),
       temperature: settings.temperature,
       maxTokens: settings.maxTokens,
       systemInstruction: settings.systemPrompt,
@@ -21,6 +22,7 @@ function generateAssistantReply({ provider, messages, apiKey, settings, signal, 
 
   return callOpenAIAPI(openAIMessages, apiKey, {
     model: settings.openaiModel,
+    allowSearch: Boolean(settings.allowOpenaiSearch),
     temperature: settings.temperature,
     maxTokens: settings.maxTokens,
     signal,
