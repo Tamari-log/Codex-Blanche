@@ -8,7 +8,26 @@ function escapeHtml(text = '') {
     .replace(/'/g, '&#39;');
 }
 
-function renderMarkdownText(text = '') {
+const MARKDOWN_RENDER_CACHE_LIMIT = 160;
+const markdownRenderCache = new Map();
+
+function getCachedMarkdownRender(source) {
+  if (markdownRenderCache.has(source)) {
+    const cached = markdownRenderCache.get(source);
+    markdownRenderCache.delete(source);
+    markdownRenderCache.set(source, cached);
+    return cached;
+  }
+  const rendered = renderMarkdownTextUncached(source);
+  markdownRenderCache.set(source, rendered);
+  if (markdownRenderCache.size > MARKDOWN_RENDER_CACHE_LIMIT) {
+    const oldestKey = markdownRenderCache.keys().next().value;
+    markdownRenderCache.delete(oldestKey);
+  }
+  return rendered;
+}
+
+function renderMarkdownTextUncached(text = '') {
   const source = String(text || '').replace(/\r\n/g, '\n');
   const codeBlockTokens = [];
   const tokenized = source.replace(/```([^\n`]*)\n([\s\S]*?)```/g, (_, lang, code) => {
@@ -169,9 +188,12 @@ function renderMarkdownText(text = '') {
 function applyBubbleText(el, text = '', { markdown = false } = {}) {
   if (!el) return;
   const normalized = text || '';
+  const nextMode = markdown ? 'markdown' : 'plain';
+  if (el.dataset.rawText === normalized && el.dataset.renderMode === nextMode) return;
   el.dataset.rawText = normalized;
+  el.dataset.renderMode = nextMode;
   if (markdown) {
-    el.innerHTML = renderMarkdownText(normalized);
+    el.innerHTML = getCachedMarkdownRender(normalized);
   } else {
     el.innerText = normalized;
   }
@@ -245,7 +267,9 @@ function createInkRevealer({ chatArea, el, mode = 'normal', canAutoScroll } = {}
 
   const renderProgress = () => {
     if (cancelled) return;
-    applyBubbleText(el, rendered, { markdown: true });
+    el.dataset.rawText = rendered;
+    el.dataset.renderMode = 'plain';
+    el.innerText = rendered;
     scrollToBottom();
   };
 
