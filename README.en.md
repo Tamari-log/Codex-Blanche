@@ -1,190 +1,133 @@
 # Codex Blanche
 
-A serverless AI client built for personal use.
+A serverless AI chat app that runs entirely in the browser.  
+It is built for personal use, but anyone can use it.
 
-This repository exists mainly to host the app.
-If you want to use it, feel free.
-
----
-
-## Live
-
-👉 https://YOUR_USERNAME.github.io/YOUR_REPO/
+- Live: https://tamari-log.github.io/Codex-Blanche/
+- 日本語: `README.md`
 
 ---
 
-## Features
+## What You Can Do
 
-* Fully client-side (no backend)
-* API keys stored locally (sessionStorage)
-* Google Drive sync for settings and chat history
-* Supports both Gemini and OpenAI models
-* Fine control over system prompt, temperature, and context
-* Built-in developer logs
+### 1) Chat with AI
 
----
+- Switch between Gemini and OpenAI
+- Choose models per provider
+- Streaming output (for supported providers)
+- Stop generation while running
+- Regenerate from any message point
 
-## Philosophy
+### 2) Control Output Behavior
 
-* The app is just a framework
-* Your data belongs to you
-* No lock-in, no backend dependency
+- System prompt configuration
+- Temperature control
+- Max tokens (context length) control
+- Thinking level selection (low / medium / high)
+  - Used with OpenAI reasoning models
 
-This is **not** a beginner-friendly product.
+### 3) Manage Presets and Conversations
 
----
+- Create, edit, and delete custom presets
+- Per-conversation setting editor (ellipsis menu)
+- Rename / delete / pin conversations
+- Carry preset settings into conversation overrides
+  - model / search flags / temperature / tokens / thinking level / signature
 
-## Setup
+### 4) Attach, Import, and Export
 
-1. Prepare your API key
+- Image attachments
+- File attachments (text extraction before sending)
+  - txt / md / json / csv / source code / pdf / docx, etc.
+- History import (`.js` / `.json`)
+- Developer JSON extraction tools
+  - extract conversation JSON by world setting
+  - extract conversation-history-only JSON
 
-   * Gemini or OpenAI
+### 5) Storage and Sync
 
-2. Open the app
+- Fully client-side (no backend required)
+- Local persistence for chats, settings, and presets
+- Optional Google Drive sync
+  - sync after login
+  - timestamp-based conflict handling
 
-3. Configure in settings
+### 6) UI / UX
 
-   * API key
-   * Model
-   * (Optional) Google Client ID
+- Mobile-friendly layout
+- Dark / light theme
+- Adjustable text render speed
+- Scroll-to-bottom shortcut button
+- Sidebar panel with history search
 
-4. (Optional) Enable Google Drive sync
+### 7) Developer Utilities
 
----
-
-## Features
-
-### Core
-
-- AI Chat (Gemini / OpenAI)
-  - Switch between providers
-  - Select models per provider
-  - Unified chat interface
-
-- System Prompt Control
-  - Custom system instructions
-  - Preset system personas
-  - Save and reuse configurations
-
-- Generation Settings
-  - Temperature control
-  - Max token (context length) control
-
----
-
-### Data & Persistence
-
-- Local State Management
-  - Chat sessions stored in browser storage
-  - Personas and settings persisted locally
-
-- Google Drive Sync
-  - Sync sessions and settings across devices
-  - Automatic push / pull on login
-  - Conflict handling using timestamps
-
-- Session-Based API Key Storage
-  - API keys stored in sessionStorage
-  - Cleared when browser session ends
+- In-app log viewer
+- Visible API error feedback
+- Modular structure (UI / API / Sync / State / DOM)
 
 ---
 
-### Chat Experience
+## Quick Start
 
-- Editable Messages
-  - Inline editing of past messages
-  - Changes are persisted automatically
+1. Open the app  
+2. Enter your API key in settings (Gemini or OpenAI)  
+3. Choose provider and model  
+4. Optionally configure system prompt, temperature, tokens, and thinking level  
+5. Send your first message  
 
-- Regenerate Responses
-  - Retry AI responses from any point
-
-- Session Management
-  - Multiple chat sessions
-  - Rename, delete, pin sessions
+If you want Drive sync, set Google Client ID and connect Google in settings.
 
 ---
 
-### UI / UX
+## Where to Configure Things
 
-- Minimal, Focused Interface
-  - Chat-first layout
-  - Mobile-friendly design
-
-- Dark / Light Mode
-  - Toggleable theme
-
-- Persona Panel
-  - Sidebar for switching presets and sessions
-  - Search within chat history
-
----
-
-### Developer Features
-
-- Built-in Log Viewer
-  - Captures console logs (log / warn / error)
-  - Accessible via advanced settings
-
-- Error Handling
-  - API error messages surfaced in UI
-  - Abortable requests (cancel generation)
-
-- Modular Structure
-  - Separated UI / API / Sync logic
-  - Dependency-injected sync module
+- `Settings > Custom Preset Creation > Model Settings`
+  - provider / model / thinking level
+- `Settings > Custom Preset Creation > Behavior`
+  - system prompt / temperature
+- `Settings > Custom Preset Creation > Context / Signature`
+  - max tokens / signature
+- `Settings > New Conversation Model Settings`
+  - default model for new conversations
+- `Preset Panel > Ellipsis Menu`
+  - edit conversation settings / edit preset / pin / delete
 
 ---
 
-### Architecture
+## Data and Security
 
-- Fully Client-Side
-  - No backend required
+- API keys are stored in `sessionStorage` (or `localStorage` if enabled)
+- Input text and attachment data are sent to the selected AI API during generation
+- The app is not designed to store your chat data on a developer backend
+- If sync is enabled, data is stored in your own Google Drive
+- You are responsible for your own security operations
 
-- User-Owned Data
-  - No server-side storage
-  - Optional cloud sync via user’s Google Drive
+### About Safety Settings
 
-- Simple Sync Model
-  - Timestamp-based conflict resolution
-  - Tombstone-based deletion handling
-
----
-
-## Notes
-
-* API keys are stored in browser session storage
-* Security is your responsibility
-* Sync is intentionally simple and may not handle complex conflicts
+- This app sends Gemini requests with `safetySettings` disabled
+- Use only with clear understanding of your policy and operational responsibility
 
 ---
 
 ## Tech Stack
 
-* Vanilla JavaScript
-* Google Drive API
-* Gemini API / OpenAI API
-* TailwindCSS
+- Vanilla JavaScript
+- Tailwind CSS
+- Gemini API
+- OpenAI API
+- Google Drive API
+
+---
+
+## Terms / Privacy
+
+- Terms: `/terms.html`
+- Privacy: `/privacy.html`
 
 ---
 
 ## Disclaimer
 
-Use at your own risk.
-No guarantees, no responsibilities.
+This app is provided as-is, without warranty. The developer is not liable for any damage caused by use.
 
----
-
-## Contributing
-
-Feel free to fork, modify, or translate.
-
----
-
-## Why this exists
-
-Because I needed it.
-
----
-
-## Terms / Privacy
-See `/terms.html` and `/privacy.html`

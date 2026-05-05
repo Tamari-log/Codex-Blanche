@@ -1,106 +1,97 @@
 ## プライバシーポリシー
 
-本アプリは、ユーザーのプライバシーを尊重し、最小限のデータ取り扱いを行います。
+本アプリは、ユーザーのプライバシーを尊重し、必要最小限のデータのみを扱います。
 
-### 1. 収集する情報
+### 1. 取り扱う情報
 
-本アプリは、以下の情報をユーザーの操作に応じて扱います。
+本アプリは、ユーザー操作に応じて次の情報を扱います。
 
-* チャット内容
-* 設定情報（システムプロンプト、モデル設定など）
-* APIキー（セッション中のみ）
+- チャット内容
+- 設定情報（モデル、システムプロンプト、温度など）
+- 添付ファイル情報（画像・テキスト抽出結果など）
+- APIキー（設定内容に応じて `sessionStorage` または `localStorage`）
 
-これらの情報は、ユーザーの利用環境内に保存されます。
+### 2. 保存場所
 
----
+データは主に以下へ保存されます。
 
-### 2. データの保存場所
+- ブラウザ `localStorage`
+- ブラウザ `sessionStorage`
+- ユーザーが連携した Google Drive（任意）
 
-* ローカルストレージ（ブラウザ内）
-* セッションストレージ（APIキー）
-* Google Drive（ユーザーが連携した場合のみ）
-
-開発者のサーバーにデータが送信・保存されることはありません。
-
----
+開発者管理のサーバーへ会話データを保存する設計ではありません。
 
 ### 3. 外部送信
 
-ユーザーが入力した内容は、以下の目的で外部APIに送信される場合があります。
+ユーザー入力および必要なコンテキストは、応答生成のため外部APIへ送信される場合があります。
 
-* AIによる応答生成（Gemini / OpenAI など）
+- Gemini API
+- OpenAI API
 
-送信されたデータは、各サービス提供者のポリシーに従って処理されます。
-
----
+送信先サービスでのデータ処理は、各サービスのポリシーに従います。
 
 ### 4. APIキーの扱い
 
-APIキーはセッション中のみブラウザ内に保存され、
-ブラウザ終了時に削除されます。
+APIキーの保存方式は設定に依存します。
 
----
+- 既定: `sessionStorage`（ブラウザセッション終了で削除）
+- 保存オプションON時: `localStorage`（ユーザーが削除するまで保持）
 
-### 5. 利用者の責任
+### 5. ユーザー責任
 
-本アプリはサーバーを持たない設計のため、
-データの管理・保護はユーザー自身の責任で行ってください。
+本アプリはサーバーレス設計です。  
+データ保護、端末保護、認証情報管理はユーザー自身の責任で行ってください。
 
----
+### 6. 改定
 
-本ポリシーは必要に応じて変更されることがあります。
+本ポリシーは、必要に応じて予告なく更新される場合があります。
 
 ---
 
 ## Privacy Policy
 
-This App respects user privacy and minimizes data handling as much as possible.
+This app respects user privacy and handles only the minimum data needed for operation.
 
-### 1. Information Handled
+### 1. Information Processed
 
-The App may handle the following data based on user actions:
+Depending on user actions, the app may process:
 
-* Chat content
-* Settings (system prompts, model configuration, etc.)
-* API keys (session-based only)
+- Chat content
+- Settings (model, system prompt, temperature, etc.)
+- Attachment-related data (images, extracted text, etc.)
+- API keys (`sessionStorage` or `localStorage`, based on settings)
 
-All data is stored within the user's environment.
+### 2. Storage Locations
 
----
+Data is primarily stored in:
 
-### 2. Data Storage
+- Browser `localStorage`
+- Browser `sessionStorage`
+- User-linked Google Drive (optional)
 
-Data may be stored in:
-
-* Browser local storage
-* Browser session storage (for API keys)
-* Google Drive (only if the user enables synchronization)
-
-No data is stored on any server controlled by the developer.
-
----
+The app is not designed to store chat data on developer-controlled servers.
 
 ### 3. External Transmission
 
-User input may be sent to external APIs for processing, such as:
+User input and required context may be sent to external APIs for response generation:
 
-* AI response generation (Gemini, OpenAI, etc.)
+- Gemini API
+- OpenAI API
 
-These services process data according to their own privacy policies.
+Data handling by those services is governed by their own policies.
 
----
+### 4. API Key Handling
 
-### 4. API Keys
+API key storage depends on user settings:
 
-API keys are stored only in session storage and are cleared when the browser session ends.
-
----
+- Default: `sessionStorage` (cleared when the browser session ends)
+- When "remember" is enabled: `localStorage` (kept until removed by the user)
 
 ### 5. User Responsibility
 
-Since this App does not provide server-side storage,
-users are fully responsible for managing and protecting their own data.
+This app is serverless.  
+You are responsible for data protection, device security, and credential management.
 
----
+### 6. Policy Updates
 
-This policy may be updated as needed.
+This policy may be updated without prior notice when needed.
