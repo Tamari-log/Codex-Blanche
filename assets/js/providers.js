@@ -52,6 +52,13 @@ function normalizeGeminiContents(messages) {
   return normalized;
 }
 
+const GEMINI_SAFETY_SETTINGS_DISABLED = [
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+];
+
 function buildProviderConnectionError(providerLabel, error) {
   if (error?.name === 'AbortError') return error;
 
@@ -104,7 +111,7 @@ async function callGeminiAPI(messages, apiKey, options = {}) {
   if (typeof options.temperature === 'number') generationConfig.temperature = options.temperature;
   if (typeof options.maxTokens === 'number') generationConfig.maxOutputTokens = options.maxTokens;
 
-  const body = { contents };
+  const body = { contents, safetySettings: GEMINI_SAFETY_SETTINGS_DISABLED };
   if (Object.keys(generationConfig).length) body.generationConfig = generationConfig;
   if (options.allowSearch) body.tools = [{ google_search: {} }];
   if (systemMessage) {
@@ -349,6 +356,9 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
     }));
 
   let response;
+  const normalizedThinkingLevel = String(options.thinkingLevel || '').toLowerCase();
+  const supportsReasoningEffort = typeof model === 'string' && /^gpt-5/i.test(model);
+  const reasoningEffort = ['low', 'medium', 'high'].includes(normalizedThinkingLevel) ? normalizedThinkingLevel : 'medium';
   try {
     response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -362,6 +372,7 @@ async function callOpenAIAPI(messages, apiKey, options = {}) {
         input,
         instructions: instructions || undefined,
         tools: options.allowSearch ? [{ type: 'web_search_preview' }] : undefined,
+        reasoning: supportsReasoningEffort ? { effort: reasoningEffort } : undefined,
         temperature: options.temperature,
         max_output_tokens: options.maxTokens,
       }),

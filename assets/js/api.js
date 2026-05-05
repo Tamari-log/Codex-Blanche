@@ -25,6 +25,7 @@ function generateAssistantReply({ provider, messages, apiKey, settings, signal, 
     allowSearch: Boolean(settings.allowOpenaiSearch),
     temperature: settings.temperature,
     maxTokens: settings.maxTokens,
+    thinkingLevel: settings.thinkingLevel,
     signal,
   });
 }

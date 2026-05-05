@@ -19,6 +19,7 @@
     maxTokens: 'max_tokens',
     userSignature: 'user_signature',
     renderSpeed: 'render_speed',
+    thinkingLevel: 'thinking_level',
     newSessionProvider: 'new_session_provider',
     newSessionGeminiModel: 'new_session_gemini_model',
     newSessionOpenaiModel: 'new_session_openai_model',
@@ -39,6 +40,7 @@
     temperature: 0.7,
     maxTokens: 2048,
     renderSpeed: 'normal',
+    thinkingLevel: 'medium',
     allowGeminiSearch: false,
     allowOpenaiSearch: false,
   };
@@ -76,6 +78,7 @@
       temperature: Number(localStorage.getItem(STORAGE_KEYS.temperature) || DEFAULT_SETTINGS.temperature),
       maxTokens: Number(localStorage.getItem(STORAGE_KEYS.maxTokens) || DEFAULT_SETTINGS.maxTokens),
       renderSpeed: localStorage.getItem(STORAGE_KEYS.renderSpeed) || DEFAULT_SETTINGS.renderSpeed,
+      thinkingLevel: localStorage.getItem(STORAGE_KEYS.thinkingLevel) || DEFAULT_SETTINGS.thinkingLevel,
       newSessionProvider: localStorage.getItem(STORAGE_KEYS.newSessionProvider) || DEFAULT_SETTINGS.provider,
       newSessionGeminiModel: localStorage.getItem(STORAGE_KEYS.newSessionGeminiModel) || DEFAULT_SETTINGS.geminiModel,
       newSessionOpenaiModel: localStorage.getItem(STORAGE_KEYS.newSessionOpenaiModel) || DEFAULT_SETTINGS.openaiModel,
