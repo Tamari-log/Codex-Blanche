@@ -106,7 +106,7 @@ function scrollChatToTop() {
 }
 
 function scrollChatToBottom() {
-  chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'smooth' });
+  chatArea.scrollTo({ top: chatArea.scrollHeight, behavior: 'auto' });
 }
 
 function updateScrollToBottomButtonVisibility() {
@@ -917,6 +917,26 @@ let selectedImageAttachments = [];
 let selectedFileAttachments = [];
 let shouldAutoScrollDuringGeneration = true;
 let isRegenerating = false;
+let activeGenerationContext = null;
+
+function registerActiveGenerationContext(context = null) {
+  activeGenerationContext = context;
+}
+
+function requestAbortCurrentGeneration() {
+  if (!currentRequestController) return false;
+  const controller = currentRequestController;
+  const context = activeGenerationContext;
+  shouldAutoScrollDuringGeneration = false;
+  if (context?.inkRevealer) context.inkRevealer.cancel();
+  if (context?.loading?.div) {
+    const streamed = String(context.streamedReplyRef?.() || '').trim();
+    context.loading.div.innerText = streamed ? `${streamed}\n\n生成を中断しています...` : '生成を中断しています...';
+  }
+  appUi.setThinkingMode(dom.sendBtn, false, { default: SEND_BUTTON_DEFAULT_ICON, stop: SEND_BUTTON_STOP_ICON });
+  controller.abort();
+  return true;
+}
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -1307,7 +1327,7 @@ function handleChatAreaScroll() {
 }
 
 async function handleSend(){
-  if(currentRequestController){currentRequestController.abort();return;}
+  if(currentRequestController){requestAbortCurrentGeneration();return;}
   const text=userInput.value.trim();
   if(!text&&!selectedImageAttachments.length&&!selectedFileAttachments.length)return;
   const s=getActiveSession();
@@ -1326,6 +1346,8 @@ async function handleSend(){
   let streamedReply='';
   let hasStreamStarted=false;
   let inkRevealer=null;
+  const wasNearBottomBeforeSend = isNearChatBottom();
+  shouldAutoScrollDuringGeneration = wasNearBottomBeforeSend;
 
   try{
     const fileNote = buildFileContentNote(selectedFileAttachments);
@@ -1341,22 +1363,22 @@ async function handleSend(){
     await persistState({ syncDrive: false });
     if(s.messages.length===1){chatArea.innerHTML='';}
     addBubble(outgoingText,'user',s.messages.length-1,true,attachments);
-    chatArea.scrollTop=chatArea.scrollHeight;
+    if (wasNearBottomBeforeSend) chatArea.scrollTop=chatArea.scrollHeight;
     updateScrollToBottomButtonVisibility();
     userInput.value='';
     userInput.dispatchEvent(new Event('input'));
     clearSelectedImageAttachment();
     clearSelectedFileAttachments();
-    shouldAutoScrollDuringGeneration=true;
-
     loading=addBubble(`思索中...
 ${BACKGROUND_WARNING_TEXT}`,'ai');
     const shouldStream=provider==='gemini';
     const renderSpeed=effectiveSettings.renderSpeed||'normal';
     if(loading?.div){inkRevealer=appUi.createInkRevealer({chatArea,el:loading.div,mode:renderSpeed,canAutoScroll:()=>shouldAutoScrollDuringGeneration});}
+    registerActiveGenerationContext({ loading, inkRevealer, streamedReplyRef: () => streamedReply });
     console.info('[stream][send] request start',{provider,shouldStream,messageCount:s.messages.length,renderSpeed,uiFallback:Boolean(appUi?.__isFallback)});
 
     const onChunk=(delta,fullText)=>{
+      if (controller.signal.aborted) return;
       if(!hasStreamStarted){console.info('[stream][send] first chunk',{provider,deltaLength:(delta||'').length});}
       hasStreamStarted=true;
       const prevStreamed=streamedReply;
@@ -1395,6 +1417,7 @@ ${BACKGROUND_WARNING_TEXT}`,'ai');
       window.alert(`送信処理に失敗しました: ${detail}`);
     }
   }finally{
+    registerActiveGenerationContext(null);
     currentRequestController=null;
     shouldAutoScrollDuringGeneration=true;
     releaseWakeLock();
@@ -1451,7 +1474,9 @@ async function regenerateAt(index){
     if(loading?.div){
       inkRevealer=appUi.createInkRevealer({chatArea,el:loading.div,mode:renderSpeed,canAutoScroll:()=>shouldAutoScrollDuringGeneration});
     }
+    registerActiveGenerationContext({ loading, inkRevealer, streamedReplyRef: () => streamedReply });
     const onChunk=(delta,fullText)=>{
+      if (controller.signal.aborted) return;
       const prevStreamed=streamedReply;
       streamedReply=fullText||`${streamedReply}${delta||''}`;
       if(inkRevealer){
@@ -1493,6 +1518,7 @@ async function regenerateAt(index){
     }
     appUi.addTransientDeleteButton(loading.wrap);
   }finally{
+    registerActiveGenerationContext(null);
     shouldAutoScrollDuringGeneration=true;
     isRegenerating=false;
     currentRequestController=null;
