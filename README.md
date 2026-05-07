@@ -1,10 +1,26 @@
 # Codex Blanche
 
+**日本語** | [English](README.en.md)
+
+## 法務
+
+- **ソースコードのライセンス**: [MIT License](LICENSE)（著作権者: **Belleval office**。再配布・改変可で、著作権表示と許諾文の維持が条件）
+- **再配布について**: MIT の条件に加え、**本ソフトウェアが Belleval office（および本リポジトリ）由来であることが分かるクレジットを残してください**。著作権表示や出典を消して「自作・オリジナル作品のみ」であるかのような主張・表示は行わないでください。
+- [利用規約（Markdown）](docs/TERMS_OF_SERVICE.md) / [Terms of Service (Markdown)](docs/TERMS_OF_SERVICE.en.md)
+- [プライバシーポリシー（Markdown）](docs/PRIVACY_POLICY.md) / [Privacy Policy (Markdown)](docs/PRIVACY_POLICY.en.md)
+- **サイト上のページ（配布ビルド）**: [利用規約](https://tamari-log.github.io/Codex-Blanche/terms.html) · [プライバシー](https://tamari-log.github.io/Codex-Blanche/privacy.html)（同内容を HTML で掲載）
+
+| | リポジトリ |
+|---|------------|
+| **Web アプリ（本リポジトリ）** | [Tamari-log/Codex-Blanche](https://github.com/Tamari-log/Codex-Blanche) |
+| **Android アプリ** | [Tamari-log/Codex-Blanche-App](https://github.com/Tamari-log/Codex-Blanche-App) |
+
+---
+
 ブラウザだけで動く、サーバーレスなAIチャットアプリです。  
 個人利用を前提に作っていますが、必要な人はそのまま使えます。
 
 - Live: https://tamari-log.github.io/Codex-Blanche/
-- English: `README.en.md`
 
 ---
 
@@ -120,14 +136,9 @@ Google Drive同期を使う場合は、設定でGoogle Client IDを入れて連�
 
 ---
 
-## 利用規約 / プライバシー
-
-- Terms: `/terms.html`
-- Privacy: `/privacy.html`
-
 ---
 
 ## 免責
 
-本アプリは無保証です。利用により生じた損害について、開発者は責任を負いません。
+概要は上記「法務」の利用規約に委ねます。詳細は [利用規約](docs/TERMS_OF_SERVICE.md) および [terms.html](https://tamari-log.github.io/Codex-Blanche/terms.html) を参照してください。
 

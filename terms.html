@@ -1,87 +1,87 @@
-## 利用規約
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>利用規約 / Terms of Service — Codex Blanche</title>
+    <style>
+        :root { color-scheme: light dark; }
+        body { font-family: system-ui, sans-serif; line-height: 1.6; max-width: 42rem; margin: 0 auto; padding: 1.25rem; color: #1a1a1a; background: #faf8f5; }
+        @media (prefers-color-scheme: dark) {
+            body { color: #e8e8e8; background: #1e293b; }
+            a { color: #93c5fd; }
+        }
+        a { color: #1d4ed8; }
+        h1 { font-size: 1.35rem; margin-top: 2rem; }
+        h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+        hr { margin: 2.5rem 0; border: 0; border-top: 1px solid #ccc; }
+        .muted { font-size: 0.85rem; opacity: 0.85; }
+        nav { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <nav><a href="./index.html">← アプリに戻る / Back to app</a></nav>
 
-このアプリ（以下「本アプリ」）は、個人が提供するツールです。  
-利用する時点で、本規約に同意したものとみなします。
+    <h1>利用規約（Codex Blanche Web）</h1>
+    <p class="muted">最終更新日: 2026年5月7日</p>
 
-### 1. 提供形態（無保証）
+    <p>本利用規約（以下「本規約」）は、ブラウザ上で動作する Web アプリケーション「Codex Blanche」（以下「本アプリ」）の利用条件を定めるものです。例: <a href="https://tamari-log.github.io/Codex-Blanche/">GitHub Pages 配布</a>。</p>
 
-本アプリは現状有姿（as-is）で提供されます。  
-動作、正確性、可用性、継続性について保証はありません。
+    <p><strong>「運営者」</strong>とは、本アプリソースコードの著作権者である<strong>Belleval office</strong>をいいます。本リポジトリは GitHub 上の <code>Tamari-log</code> 組織のもとにホストされる場合がありますが、<strong>著作権者名義は Belleval office</strong>とします。</p>
 
-### 2. 利用責任
+    <h2>1. 適用</h2>
+    <p>本規約は本アプリを利用するすべての方に適用されます。本アプリは <a href="https://github.com/Tamari-log/Codex-Blanche">Tamari-log/Codex-Blanche</a> で公開される場合があります。本規約に加え、<a href="./privacy.html">プライバシーポリシー</a>も適用されます。</p>
 
-本アプリの利用はユーザー自身の責任で行ってください。  
-利用により生じた損害について、開発者は責任を負いません。
+    <h2>2. 本アプリの性質</h2>
+    <p>本アプリは<strong>サーバーレス</strong>でブラウザ内で動作し、ユーザーが指定する Google Gemini および OpenAI 等の AI プロバイダの API を利用します。応答の正確性・可用性等について運営者は保証しません。本アプリは現状有姿で提供されます。Gemini 呼び出し時に <code>safetySettings</code> を無効化して送信する場合があります。</p>
 
-### 3. APIキー・アカウント管理
+    <h2>3. API キー</h2>
+    <p>API キー等はユーザー自身の責任で管理し、設定に応じて <code>sessionStorage</code> または <code>localStorage</code> に保存される場合があります（詳細はプライバシーポリシーを参照）。</p>
 
-APIキーおよび連携アカウント（例: Google）は、ユーザー自身で管理してください。  
-漏えい、不正利用、利用料金の発生等について、開発者は責任を負いません。
+    <h2>4. 禁止事項</h2>
+    <p>法令違反、第三者の規約違反、濫用・不正アクセス、権利侵害、その他犯罪に結びつく利用を禁止します。</p>
 
-### 4. 外部サービスの利用
+    <h2>5. 知的財産・再配布</h2>
+    <p>ソースコードのライセンスはリポジトリ内の <a href="https://github.com/Tamari-log/Codex-Blanche/blob/main/LICENSE">LICENSE</a> に従います。著作権者名義は <strong>Belleval office</strong> です。再配布・フォーク時はライセンスが求める表示に加え、<strong>Belleval office および本リポジトリ由来であることが合理的に分かるクレジットを残す</strong>ものとし、<strong>自己のみがオリジナルの作者であるかのように誤認させる表示・主張</strong>をしてはなりません。</p>
 
-本アプリは以下の外部サービスと連携する場合があります。
+    <h2>6. 免責</h2>
+    <p>運営者に故意または重過失がある場合を除き、本アプリの利用に起因する損害について責任を負いません。AI プロバイダの変更・停止等についても責任を負いません。</p>
 
-- Google Drive
-- Gemini API
-- OpenAI API
+    <h2>7. 変更・お問い合わせ</h2>
+    <p>本規約は必要に応じて変更されます。ご意見は <a href="https://github.com/Tamari-log/Codex-Blanche/issues">Issues</a> へ。</p>
 
-外部サービスの利用には、各サービス提供者の利用規約・ポリシーが適用されます。
+    <p class="muted">本ページは要約です。全文は <a href="https://github.com/Tamari-log/Codex-Blanche/blob/main/docs/TERMS_OF_SERVICE.md">docs/TERMS_OF_SERVICE.md</a>（日本語）を参照してください。</p>
 
-### 5. セーフティ設定と利用上の注意
+    <hr>
 
-本アプリは Gemini へのリクエスト時に `safetySettings` を無効化して送信します。  
-利用者は、適用される法令・ポリシー・社内規程を確認したうえで運用してください。
+    <h1>Terms of Service (Codex Blanche Web)</h1>
+    <p class="muted">Last updated: May 7, 2026</p>
 
-### 6. 禁止事項
+    <p>These Terms govern use of the browser-based web application “Codex Blanche,” for example the <a href="https://tamari-log.github.io/Codex-Blanche/">GitHub Pages deployment</a>.</p>
 
-本アプリを、法令違反、権利侵害、または第三者へ重大な損害を与える目的で利用してはいけません。
+    <p><strong>“Operator”</strong> means <strong>Belleval office</strong>, the copyright holder of the App’s source code. The repository may be hosted under the <code>Tamari-log</code> organization on GitHub.</p>
 
-### 7. 変更・終了
+    <h2>1. Scope</h2>
+    <p>These Terms apply to all users. The <a href="./privacy.html">Privacy Policy</a> also applies.</p>
 
-本アプリの仕様、機能、公開状態は、予告なく変更または終了される場合があります。
+    <h2>2. Nature of the App</h2>
+    <p>The App runs serverlessly in your browser and uses AI Provider APIs you configure. Provided “as is,” without warranties. Gemini requests may be sent with <code>safetySettings</code> disabled.</p>
 
----
+    <h2>3. API keys</h2>
+    <p>You are responsible for credentials, stored per settings in <code>sessionStorage</code> or <code>localStorage</code>.</p>
 
-## Terms of Service
+    <h2>4. Prohibited conduct</h2>
+    <p>Unlawful use, abuse, unauthorized access, rights infringement, and similar conduct are prohibited.</p>
 
-This app ("the App") is provided by an individual.  
-By using the App, you agree to these terms.
+    <h2>5. Intellectual property / redistribution</h2>
+    <p>Licensing follows the repository <a href="https://github.com/Tamari-log/Codex-Blanche/blob/main/LICENSE">LICENSE</a>. Copyright: <strong>Belleval office</strong>. When redistributing or forking, <strong>preserve reasonable credit to Belleval office and this repository</strong> and do not <strong>misrepresent yourself as the sole original author</strong> (“passing off”).</p>
 
-### 1. As-Is / No Warranty
+    <h2>6. Limitation of liability</h2>
+    <p>To the extent permitted by law, the Operator is not liable for damages arising from use of the App, except where mandatory law provides otherwise.</p>
 
-The App is provided on an as-is basis.  
-No warranties are made regarding functionality, accuracy, availability, or continuity.
+    <h2>7. Changes / contact</h2>
+    <p>Terms may be updated. Feedback: <a href="https://github.com/Tamari-log/Codex-Blanche/issues">Issues</a>.</p>
 
-### 2. User Responsibility
-
-You use the App at your own risk.  
-The developer is not liable for any damages arising from your use of the App.
-
-### 3. API Keys and Account Management
-
-You are responsible for managing your API keys and linked accounts (e.g., Google).  
-The developer is not responsible for leakage, misuse, or charges caused by such credentials.
-
-### 4. Third-Party Services
-
-The App may interact with external services, including:
-
-- Google Drive
-- Gemini API
-- OpenAI API
-
-Use of those services is governed by their own terms and policies.
-
-### 5. Safety Settings Notice
-
-The App sends Gemini requests with `safetySettings` disabled.  
-You are responsible for operating the App in compliance with applicable laws and internal policies.
-
-### 6. Prohibited Use
-
-You must not use the App for unlawful activity, rights infringement, or actions that may cause serious harm to others.
-
-### 7. Changes and Termination
-
-The App may be changed, suspended, or discontinued at any time without prior notice.
+    <p class="muted">This page is a summary. Full text: <a href="https://github.com/Tamari-log/Codex-Blanche/blob/main/docs/TERMS_OF_SERVICE.en.md">docs/TERMS_OF_SERVICE.en.md</a>.</p>
+</body>
+</html>
